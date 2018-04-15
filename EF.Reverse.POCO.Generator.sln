@@ -18,6 +18,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		README.md = README.md
 	EndProjectSection
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Scratch", "Scratch\Scratch.csproj", "{7638DEA9-A4EF-46DD-ADE2-81D967246751}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -72,6 +74,18 @@ Global
 		{14C1FD62-34DB-49B9-B35A-B363398D0914}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
 		{14C1FD62-34DB-49B9-B35A-B363398D0914}.Release|Mixed Platforms.Build.0 = Release|Any CPU
 		{14C1FD62-34DB-49B9-B35A-B363398D0914}.Release|x86.ActiveCfg = Release|Any CPU
+		{7638DEA9-A4EF-46DD-ADE2-81D967246751}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7638DEA9-A4EF-46DD-ADE2-81D967246751}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7638DEA9-A4EF-46DD-ADE2-81D967246751}.Debug|Mixed Platforms.ActiveCfg = Debug|Any CPU
+		{7638DEA9-A4EF-46DD-ADE2-81D967246751}.Debug|Mixed Platforms.Build.0 = Debug|Any CPU
+		{7638DEA9-A4EF-46DD-ADE2-81D967246751}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{7638DEA9-A4EF-46DD-ADE2-81D967246751}.Debug|x86.Build.0 = Debug|Any CPU
+		{7638DEA9-A4EF-46DD-ADE2-81D967246751}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7638DEA9-A4EF-46DD-ADE2-81D967246751}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7638DEA9-A4EF-46DD-ADE2-81D967246751}.Release|Mixed Platforms.ActiveCfg = Release|Any CPU
+		{7638DEA9-A4EF-46DD-ADE2-81D967246751}.Release|Mixed Platforms.Build.0 = Release|Any CPU
+		{7638DEA9-A4EF-46DD-ADE2-81D967246751}.Release|x86.ActiveCfg = Release|Any CPU
+		{7638DEA9-A4EF-46DD-ADE2-81D967246751}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
