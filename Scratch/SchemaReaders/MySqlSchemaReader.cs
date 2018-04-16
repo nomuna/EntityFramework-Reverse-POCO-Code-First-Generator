@@ -4,8 +4,8 @@ namespace Scratch.SchemaReaders
 {
     public class MySqlSchemaReader : SchemaReader
     {
-        public MySqlSchemaReader(DbConnection connection, DbProviderFactory factory, GeneratedTextTransformation generatedTextTransformation)
-            : base(connection, factory, generatedTextTransformation)
+        public MySqlSchemaReader(DbProviderFactory factory, GeneratedTextTransformation outer)
+            : base(factory, outer)
         {
         }
 

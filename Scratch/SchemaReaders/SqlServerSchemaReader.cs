@@ -1,4 +1,5 @@
-﻿using System.Data.Common;
+﻿using System;
+using System.Data.Common;
 
 namespace Scratch.SchemaReaders
 {
@@ -7,8 +8,8 @@ namespace Scratch.SchemaReaders
     {
         private string _sqlDatabaseEdition, _sqlDatabaseEngineEdition;
 
-        public SqlServerSchemaReader(DbConnection connection, DbProviderFactory factory, GeneratedTextTransformation outer)
-            : base(connection, factory, outer)
+        public SqlServerSchemaReader(DbProviderFactory factory, GeneratedTextTransformation outer)
+            : base(factory, outer)
         {
             _sqlDatabaseEdition = null;
             _sqlDatabaseEngineEdition = null;
@@ -161,7 +162,7 @@ WHERE   fkData.n = 1 -- Remove duplicate FK's";
         protected override string ExtendedPropertySQL()
         {
             if (IsAzure())
-                return null;
+                return string.Empty;
 
             return @"
 SELECT  s.name AS [schema],
@@ -182,7 +183,7 @@ ORDER BY t.name";
 
         protected override string DoesExtendedPropertyTableExistSQL()
         {
-            return null;
+            return string.Empty;
         }
 
         protected override string IndexSQL()

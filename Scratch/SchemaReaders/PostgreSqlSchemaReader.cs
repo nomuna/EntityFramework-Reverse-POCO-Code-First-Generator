@@ -4,8 +4,8 @@ namespace Scratch.SchemaReaders
 {
     public class PostgreSqlSchemaReader : SchemaReader
     {
-        public PostgreSqlSchemaReader(DbConnection connection, DbProviderFactory factory, GeneratedTextTransformation generatedTextTransformation)
-            : base(connection, factory, generatedTextTransformation)
+        public PostgreSqlSchemaReader(DbProviderFactory factory, GeneratedTextTransformation outer)
+            : base(factory, outer)
         {
         }
 

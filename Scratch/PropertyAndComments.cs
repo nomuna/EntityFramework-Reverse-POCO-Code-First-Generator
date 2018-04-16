@@ -1,7 +1,5 @@
 ﻿namespace Scratch
 {
-    #region Nested type: Column
-
     public class PropertyAndComments
     {
         public string Definition;

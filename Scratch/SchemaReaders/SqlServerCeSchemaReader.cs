@@ -4,8 +4,8 @@ namespace Scratch.SchemaReaders
 {
     public class SqlServerCeSchemaReader : SchemaReader
     {
-        public SqlServerCeSchemaReader(DbConnection connection, DbProviderFactory factory, GeneratedTextTransformation generatedTextTransformation)
-            : base(connection, factory, generatedTextTransformation)
+        public SqlServerCeSchemaReader(DbProviderFactory factory, GeneratedTextTransformation outer)
+            : base(factory, outer)
         {
         }
 

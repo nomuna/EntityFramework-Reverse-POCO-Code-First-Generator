@@ -103,31 +103,24 @@ namespace Scratch
             switch (Settings.DatabaseType)
             {
                 case DatabaseType.SqlServer:
-                    return new SqlServerSchemaReader(connection, factory, this);
+                    return new SqlServerSchemaReader(factory, this);
 
                 case DatabaseType.SqlCe:
-                    return new SqlServerCeSchemaReader(connection, factory, this);
+                    return new SqlServerCeSchemaReader(factory, this);
 
                 case DatabaseType.MySql:
-                    return new MySqlSchemaReader(connection, factory, this);
+                    return new MySqlSchemaReader(factory, this);
 
                 case DatabaseType.PostgreSQL:
-                    return new PostgreSqlSchemaReader(connection, factory, this);
+                    return new PostgreSqlSchemaReader(factory, this);
 
                 case DatabaseType.Oracle:
-                    return new OracleSchemaReader(connection, factory, this);
+                    return new OracleSchemaReader(factory, this);
 
                 default:
                     WriteLine("Cannot create a schema reader due to unknown database type.");
                     return null;
             }
-        }
-
-        private bool IsSqlCeConnection(DbConnection connection)
-        {
-            if (connection.GetType().Name.ToLower() == "sqlceconnection")
-                return true;
-            return false;
         }
 
         public Tables LoadTables(DbProviderFactory factory)
@@ -140,58 +133,41 @@ namespace Scratch
 
             try
             {
-                using (var conn = factory.CreateConnection())
+                var reader = new SqlServerSchemaReader(factory, this);
+                var tables = reader.ReadSchema();
+                var fkList = reader.ReadForeignKeys();
+                reader.IdentifyForeignKeys(fkList, tables);
+
+                foreach (var t in tables)
                 {
-                    if (conn == null)
-                        return new Tables();
-
-                    conn.ConnectionString = Settings.ConnectionString;
-                    conn.Open();
-
-                    Settings.IsSqlCe = IsSqlCeConnection(conn);
-
-                    if (Settings.IsSqlCe)
-                        Settings.PrependSchemaName = false;
-
-                    var reader = new SqlServerSchemaReader(conn, factory, this);
-                    var tables = reader.ReadSchema();
-                    var fkList = reader.ReadForeignKeys();
-                    reader.IdentifyForeignKeys(fkList, tables);
-
-                    foreach (var t in tables)
-                    {
-                        if (Settings.UseDataAnnotations)
-                            t.SetupDataAnnotations();
-                        t.Suffix = Settings.TableSuffix;
-                    }
-
-                    // Work out if there are any foreign key relationship naming clashes
-                    reader.ProcessForeignKeys(fkList, tables, true);
-                    if (Settings.UseMappingTables)
-                        tables.IdentifyMappingTables(fkList, true);
-
-                    // Now we know our foreign key relationships and have worked out if there are any name clashes,
-                    // re-map again with intelligently named relationships.
-                    tables.ResetNavigationProperties();
-
-                    reader.ProcessForeignKeys(fkList, tables, false);
-                    if (Settings.UseMappingTables)
-                        tables.IdentifyMappingTables(fkList, false);
-
-                    conn.Close();
-                    return tables;
+                    if (Settings.UseDataAnnotations)
+                        t.SetupDataAnnotations();
+                    t.Suffix = Settings.TableSuffix;
                 }
+
+                // Work out if there are any foreign key relationship naming clashes
+                reader.ProcessForeignKeys(fkList, tables, true);
+                if (Settings.UseMappingTables)
+                    tables.IdentifyMappingTables(fkList, true);
+
+                // Now we know our foreign key relationships and have worked out if there are any name clashes,
+                // re-map again with intelligently named relationships.
+                tables.ResetNavigationProperties();
+
+                reader.ProcessForeignKeys(fkList, tables, false);
+                if (Settings.UseMappingTables)
+                    tables.IdentifyMappingTables(fkList, false);
+
+                return tables;
             }
             catch (Exception x)
             {
                 string error = x.Message.Replace("\r\n", "\n").Replace("\n", " ");
                 Warning(string.Format("Failed to read database schema - {0}", error));
                 WriteLine("");
-                WriteLine(
-                    "// -----------------------------------------------------------------------------------------");
+                WriteLine("// -----------------------------------------------------------------------------------------");
                 WriteLine("// Failed to read database schema in LoadTables() - {0}", error);
-                WriteLine(
-                    "// -----------------------------------------------------------------------------------------");
+                WriteLine("// -----------------------------------------------------------------------------------------");
                 WriteLine("");
                 return new Tables();
             }
@@ -216,7 +192,7 @@ namespace Scratch
                     if (Settings.IsSqlCe)
                         return new List<StoredProcedure>();
 
-                    var reader = new SqlServerSchemaReader(conn, factory, this);
+                    var reader = new SqlServerSchemaReader(factory, this);
                     var storedProcs = reader.ReadStoredProcs();
                     conn.Close();
 

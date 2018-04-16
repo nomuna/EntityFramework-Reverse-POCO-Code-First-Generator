@@ -4,8 +4,8 @@ namespace Scratch.SchemaReaders
 {
     public class OracleSchemaReader : SchemaReader
     {
-        public OracleSchemaReader(DbConnection connection, DbProviderFactory factory, GeneratedTextTransformation generatedTextTransformation)
-            : base(connection, factory, generatedTextTransformation)
+        public OracleSchemaReader(DbProviderFactory factory, GeneratedTextTransformation outer)
+            : base(factory, outer)
         {
         }
 

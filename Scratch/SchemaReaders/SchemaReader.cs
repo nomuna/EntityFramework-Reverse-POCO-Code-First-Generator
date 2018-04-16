@@ -34,7 +34,6 @@ namespace Scratch.SchemaReaders
         protected abstract string GetPropertyType(string dbType);
 
 
-        private readonly DbConnection _connection;
         private readonly DbProviderFactory _factory;
         private readonly GeneratedTextTransformation _generatedTextTransformation;
 
@@ -55,200 +54,219 @@ namespace Scratch.SchemaReaders
             "virtual", "volatile", "void", "while"
         };
 
-        protected SchemaReader(DbConnection connection, DbProviderFactory factory, GeneratedTextTransformation generatedTextTransformation)
+        protected SchemaReader(DbProviderFactory factory, GeneratedTextTransformation generatedTextTransformation)
         {
-            _connection = connection;
             _factory = factory;
             _generatedTextTransformation = generatedTextTransformation;
         }
 
-        protected DbCommand GetCmd()
+        protected DbCommand GetCmd(DbConnection connection)
         {
             var cmd = _factory.CreateCommand();
             if (cmd != null)
-                cmd.Connection = _connection;
+                cmd.Connection = connection;
             return cmd;
         }
 
         public Tables ReadSchema()
         {
             var result = new Tables();
-            var cmd = GetCmd();
-            if (cmd == null)
-                return result;
+            using (var conn = _factory.CreateConnection())
+            {
+                if (conn == null)
+                    return result;
 
-            if (Settings.IncludeSynonyms)
-                cmd.CommandText = SynonymTableSQLSetup() + TableSQL() + SynonymTableSQL() + SpecialQueryFlags();
-            else
-                cmd.CommandText = TableSQL() + SpecialQueryFlags();
+                conn.ConnectionString = Settings.ConnectionString;
+                conn.Open();
 
-            if (Settings.IsSqlCe)
-                cmd.CommandText = TableSQLCE;
-            else
+                var t = conn.GetType();
+                var tname = t.Name.ToLower();
+                if(tname == "sqlceconnection")
+                    Settings.IsSqlCe = true;
+
+                if (Settings.IsSqlCe)
+                    Settings.PrependSchemaName = false;
+
+
+                var cmd = GetCmd(conn);
+                if (cmd == null)
+                    return result;
+
+                if (Settings.IncludeSynonyms)
+                    cmd.CommandText = SynonymTableSQLSetup() + TableSQL() + SynonymTableSQL() + SpecialQueryFlags();
+                else
+                    cmd.CommandText = TableSQL() + SpecialQueryFlags();
+
                 cmd.CommandTimeout = Settings.CommandTimeout;
 
-            using (var rdr = cmd.ExecuteReader())
-            {
-                var lastTable = string.Empty;
-                Table table = null;
-                while (rdr.Read())
+                using (var rdr = cmd.ExecuteReader())
                 {
-                    string schema = rdr["SchemaName"].ToString().Trim();
-                    if (IsFilterExcluded(Settings.SchemaFilterExclude, Settings.SchemaFilterInclude, schema))
-                        continue;
-
-                    string tableName = rdr["TableName"].ToString().Trim();
-                    if (IsFilterExcluded(Settings.TableFilterExclude, Settings.TableFilterInclude, tableName))
-                        continue;
-
-                    if (lastTable != tableName || table == null)
+                    var lastTable = string.Empty;
+                    Table table = null;
+                    while (rdr.Read())
                     {
-                        // The data from the database is not sorted
-                        table = result.Find(x => x.Name == tableName && x.Schema == schema);
-                        if (table == null)
+                        var schema = rdr["SchemaName"].ToString().Trim();
+                        if (IsFilterExcluded(Settings.SchemaFilterExclude, Settings.SchemaFilterInclude, schema))
+                            continue;
+
+                        var tableName = rdr["TableName"].ToString().Trim();
+                        if (IsFilterExcluded(Settings.TableFilterExclude, Settings.TableFilterInclude, tableName))
+                            continue;
+
+                        if (lastTable != tableName || table == null)
                         {
-                            table = new Table
+                            // The data from the database is not sorted
+                            table = result.Find(x => x.Name == tableName && x.Schema == schema);
+                            if (table == null)
                             {
-                                Name = tableName,
-                                Schema = schema,
-                                IsView = string.Compare(rdr["TableType"].ToString().Trim(), "View", StringComparison.OrdinalIgnoreCase) == 0,
+                                table = new Table
+                                {
+                                    Name = tableName,
+                                    Schema = schema,
+                                    IsView = string.Compare(rdr["TableType"].ToString().Trim(), "View", StringComparison.OrdinalIgnoreCase) == 0,
 
-                                // Will be set later
-                                HasForeignKey = false,
-                                HasNullableColumns = false
-                            };
+                                    // Will be set later
+                                    HasForeignKey = false,
+                                    HasNullableColumns = false
+                                };
 
-                            if (!Settings.IncludeViews && table.IsView)
-                                continue;
+                                if (!Settings.IncludeViews && table.IsView)
+                                    continue;
 
-                            tableName = Settings.TableRename(tableName, schema, table.IsView);
-                            if (IsFilterExcluded(Settings.TableFilterExclude, null, tableName)) // Retest exclusion filter after table rename
-                                continue;
+                                tableName = Settings.TableRename(tableName, schema, table.IsView);
+                                if (IsFilterExcluded(Settings.TableFilterExclude, null, tableName)) // Retest exclusion filter after table rename
+                                    continue;
 
-                            // Handle table names with underscores - singularise just the last word
-                            table.ClassName = Inflector.MakeSingular(CleanUp(tableName));
-                            var titleCase =
-                                (Settings.UsePascalCase ? Inflector.ToTitleCase(table.ClassName) : table.ClassName)
-                                .Replace(" ", "").Replace("$", "").Replace(".", "");
-                            table.NameHumanCase = titleCase;
+                                // Handle table names with underscores - singularise just the last word
+                                table.ClassName = Inflector.MakeSingular(CleanUp(tableName));
+                                var titleCase = (Settings.UsePascalCase ? Inflector.ToTitleCase(table.ClassName) : table.ClassName)
+                                    .Replace(" ", "")
+                                    .Replace("$", "")
+                                    .Replace(".", "");
 
-                            if (Settings.PrependSchemaName &&
-                                string.Compare(table.Schema, "dbo", StringComparison.OrdinalIgnoreCase) != 0)
-                                table.NameHumanCase = table.Schema + "_" + table.NameHumanCase;
+                                table.NameHumanCase = titleCase;
 
-                            // Check for table or C# name clashes
-                            if (ReservedKeywords.Contains(table.NameHumanCase) ||
-                                (Settings.UsePascalCase &&
-                                 result.Find(x => x.NameHumanCase == table.NameHumanCase) != null))
-                            {
-                                table.NameHumanCase += "1";
+                                if (Settings.PrependSchemaName && string.Compare(table.Schema, "dbo", StringComparison.OrdinalIgnoreCase) != 0)
+                                    table.NameHumanCase = table.Schema + "_" + table.NameHumanCase;
+
+                                // Check for table or C# name clashes
+                                if (ReservedKeywords.Contains(table.NameHumanCase) ||
+                                    (Settings.UsePascalCase && result.Find(x => x.NameHumanCase == table.NameHumanCase) != null))
+                                {
+                                    table.NameHumanCase += "1";
+                                }
+
+                                if (!Settings.TableFilter(table))
+                                    continue;
+
+                                result.Add(table);
                             }
-
-                            if (!Settings.TableFilter(table))
-                                continue;
-
-                            result.Add(table);
                         }
+
+                        var col = CreateColumn(rdr, table);
+                        if (col != null)
+                            table.Columns.Add(col);
                     }
-
-                    var col = CreateColumn(rdr, table);
-                    if (col != null)
-                        table.Columns.Add(col);
                 }
-            }
 
-            // Check for property name clashes in columns
-            foreach (Column c in result.SelectMany(tbl => tbl.Columns.Where(c => tbl.Columns.FindAll(x => x.NameHumanCase == c.NameHumanCase).Count > 1)))
-            {
-                int n = 1;
-                var original = c.NameHumanCase;
-                c.NameHumanCase = original + n++;
-
-                // Check if the above resolved the name clash, if not, use next value
-                while (c.ParentTable.Columns.Count(c2 => c2.NameHumanCase == c.NameHumanCase) > 1)
+                // Check for property name clashes in columns
+                foreach (var c in result.SelectMany(tbl => tbl.Columns.Where(c => tbl.Columns.FindAll(x => x.NameHumanCase == c.NameHumanCase).Count > 1)))
+                {
+                    var n = 1;
+                    var original = c.NameHumanCase;
                     c.NameHumanCase = original + n++;
-            }
 
-            if (Settings.IncludeExtendedPropertyComments != CommentsStyle.None)
-                ReadExtendedProperties(result);
+                    // Check if the above resolved the name clash, if not, use next value
+                    while (c.ParentTable.Columns.Count(c2 => c2.NameHumanCase == c.NameHumanCase) > 1)
+                        c.NameHumanCase = original + n++;
+                }
 
-            ReadIndexes(result);
+                if (Settings.IncludeExtendedPropertyComments != CommentsStyle.None)
+                    ReadExtendedProperties(conn, result);
 
-            foreach (Table tbl in result)
-            {
-                tbl.SetPrimaryKeys();
-                foreach (Column c in tbl.Columns)
-                    Settings.UpdateColumn(c, tbl);
-                tbl.Columns.ForEach(x => x.SetupEntityAndConfig());
+                ReadIndexes(conn, result);
+
+                foreach (var tbl in result)
+                {
+                    tbl.SetPrimaryKeys();
+                    foreach (var c in tbl.Columns)
+                        Settings.UpdateColumn(c, tbl);
+                    tbl.Columns.ForEach(x => x.SetupEntityAndConfig());
+                }
+
+                conn.Close();
             }
 
             return result;
         }
 
-        protected List<ForeignKey> ReadForeignKeys()
+        public List<ForeignKey> ReadForeignKeys()
         {
-            var fkList = new List<ForeignKey>();
-            var cmd = GetCmd();
-            if (cmd == null)
-                return fkList;
+            var result = new List<ForeignKey>();
+            using (var conn = _factory.CreateConnection())
+            {
+                if (conn == null)
+                    return result;
 
-            cmd.CommandText = ForeignKeySQL + SpecialQueryFlags();
+                conn.ConnectionString = Settings.ConnectionString;
+                conn.Open();
 
-            if (Settings.IncludeSynonyms)
-                cmd.CommandText = SynonymForeignKeySQLSetup + ForeignKeySQL + SynonymForeignKeySQL +
-                                  SpecialQueryFlags();
+                var cmd = GetCmd(conn);
+                if (cmd == null)
+                    return result;
 
-            if (Settings.IsSqlCe)
-                cmd.CommandText = ForeignKeySQLCE;
-            else
+                if (Settings.IncludeSynonyms)
+                    cmd.CommandText = SynonymForeignKeySQLSetup() + ForeignKeySQL() + SynonymForeignKeySQL() + SpecialQueryFlags();
+                else
+                    cmd.CommandText = ForeignKeySQL() + SpecialQueryFlags();
+
                 cmd.CommandTimeout = Settings.CommandTimeout;
 
-            using (DbDataReader rdr = cmd.ExecuteReader())
-            {
-                while (rdr.Read())
+                using (var rdr = cmd.ExecuteReader())
                 {
-                    var fkTableName = rdr["FK_Table"].ToString();
-                    var fkSchema = rdr["fkSchema"].ToString();
-                    var pkTableName = rdr["PK_Table"].ToString();
-                    var pkSchema = rdr["pkSchema"].ToString();
-                    var fkColumn = rdr["FK_Column"].ToString();
-                    var pkColumn = rdr["PK_Column"].ToString();
-                    var constraintName = rdr["Constraint_Name"].ToString();
-                    var ordinal = (int)rdr["ORDINAL_POSITION"];
-                    var cascadeOnDelete = ((int)rdr["CascadeOnDelete"]) == 1;
-                    var isNotEnforced = (bool)rdr["IsNotEnforced"];
+                    while (rdr.Read())
+                    {
+                        var fkTableName = rdr["FK_Table"].ToString();
+                        var fkSchema = rdr["fkSchema"].ToString();
+                        var pkTableName = rdr["PK_Table"].ToString();
+                        var pkSchema = rdr["pkSchema"].ToString();
+                        var fkColumn = rdr["FK_Column"].ToString();
+                        var pkColumn = rdr["PK_Column"].ToString();
+                        var constraintName = rdr["Constraint_Name"].ToString();
+                        var ordinal = (int) rdr["ORDINAL_POSITION"];
+                        var cascadeOnDelete = ((int) rdr["CascadeOnDelete"]) == 1;
+                        var isNotEnforced = (bool) rdr["IsNotEnforced"];
 
-                    var fkTableNameFiltered = Settings.TableRename(fkTableName, fkSchema, false);
-                    var pkTableNameFiltered = Settings.TableRename(pkTableName, pkSchema, false);
+                        var fkTableNameFiltered = Settings.TableRename(fkTableName, fkSchema, false);
+                        var pkTableNameFiltered = Settings.TableRename(pkTableName, pkSchema, false);
 
-                    var fk = new ForeignKey(fkTableName, fkSchema, pkTableName, pkSchema, fkColumn, pkColumn,
-                        constraintName, fkTableNameFiltered, pkTableNameFiltered, ordinal, cascadeOnDelete, isNotEnforced);
+                        var fk = new ForeignKey(fkTableName, fkSchema, pkTableName, pkSchema, fkColumn, pkColumn,
+                            constraintName, fkTableNameFiltered, pkTableNameFiltered, ordinal, cascadeOnDelete,
+                            isNotEnforced);
 
-                    var filteredFk = Settings.ForeignKeyFilter(fk);
-                    if (filteredFk != null)
-                        fkList.Add(filteredFk);
+                        var filteredFk = Settings.ForeignKeyFilter(fk);
+                        if (filteredFk != null)
+                            result.Add(filteredFk);
+                    }
                 }
             }
 
-            return fkList;
+            return result;
         }
 
         // When a table has no primary keys, all the NOT NULL columns are set as being the primary key.
         // This function reads the unique indexes for a table, and correctly sets the columns being used as primary keys.
-        protected void ReadIndexes(Tables tables)
+        private void ReadIndexes(DbConnection conn, Tables tables)
         {
-            var cmd = GetCmd();
+            var cmd = GetCmd(conn);
             if (cmd == null)
                 return;
 
-            if (Settings.IsSqlCe)
-                return;
-
-            cmd.CommandText = IndexSQL + SpecialQueryFlags();
+            cmd.CommandText = IndexSQL() + SpecialQueryFlags();
             cmd.CommandTimeout = Settings.CommandTimeout;
 
             var list = new List<Index>();
-            using (DbDataReader rdr = cmd.ExecuteReader())
+            using (var rdr = cmd.ExecuteReader())
             {
                 while (rdr.Read())
                 {
@@ -257,13 +275,13 @@ namespace Scratch.SchemaReaders
                         Schema = rdr["TableSchema"].ToString().Trim(),
                         TableName = rdr["TableName"].ToString().Trim(),
                         IndexName = rdr["IndexName"].ToString().Trim(),
-                        KeyOrdinal = (byte)rdr["KeyOrdinal"],
+                        KeyOrdinal = (byte) rdr["KeyOrdinal"],
                         ColumnName = rdr["ColumnName"].ToString().Trim(),
-                        ColumnCount = (int)rdr["ColumnCount"],
-                        IsUnique = (bool)rdr["IsUnique"],
-                        IsPrimaryKey = (bool)rdr["IsPrimaryKey"],
-                        IsUniqueConstraint = (bool)rdr["IsUniqueConstraint"],
-                        IsClustered = ((int)rdr["IsClustered"]) == 1
+                        ColumnCount = (int) rdr["ColumnCount"],
+                        IsUnique = (bool) rdr["IsUnique"],
+                        IsPrimaryKey = (bool) rdr["IsPrimaryKey"],
+                        IsUniqueConstraint = (bool) rdr["IsUniqueConstraint"],
+                        IsClustered = ((int) rdr["IsClustered"]) == 1
                     };
 
                     list.Add(index);
@@ -337,33 +355,29 @@ namespace Scratch.SchemaReaders
             }
         }
 
-        protected void ReadExtendedProperties(Tables tables)
+        private void ReadExtendedProperties(DbConnection conn, Tables tables)
         {
-            var cmd = GetCmd();
+            var cmd = GetCmd(conn);
             if (cmd == null)
                 return;
 
-            if (Settings.IsSqlCe)
-            {
-                var sql = DoesExtendedPropertyTableExistSQL();
-                if (!string.IsNullOrEmpty(sql))
-                {
-                    cmd.CommandText = DoesExtendedPropertyTableExistSQL();
-                    var obj = cmd.ExecuteScalar();
-                    if (obj == null)
-                        return;
-                }
+            var extendedPropertySQL = ExtendedPropertySQL();
+            if (string.IsNullOrEmpty(extendedPropertySQL))
+                return;
 
-                cmd.CommandText = ExtendedPropertySQLCE;
-            }
-            else
+            // Check if any SQL is returned. If so, run it. (Specific to SqlCE)
+            var doesExtendedPropertyTableExistSQL = DoesExtendedPropertyTableExistSQL();
+            if (!string.IsNullOrEmpty(doesExtendedPropertyTableExistSQL))
             {
-                if (IsAzure())
-                    return;
-
-                cmd.CommandText = ExtendedPropertySQL + SpecialQueryFlags();
+                cmd.CommandText = doesExtendedPropertyTableExistSQL;
                 cmd.CommandTimeout = Settings.CommandTimeout;
+                var obj = cmd.ExecuteScalar();
+                if (obj == null)
+                    return; // No extended properties table
             }
+
+            cmd.CommandText = extendedPropertySQL + SpecialQueryFlags();
+            cmd.CommandTimeout = Settings.CommandTimeout;
 
             var commentsInSummaryBlock = Settings.IncludeExtendedPropertyComments == CommentsStyle.InSummaryBlock;
 
@@ -405,106 +419,113 @@ namespace Scratch.SchemaReaders
             }
         }
 
-        protected List<StoredProcedure> ReadStoredProcs()
+        public List<StoredProcedure> ReadStoredProcs()
         {
             var result = new List<StoredProcedure>();
-            var cmd = GetCmd();
-            if (cmd == null)
+            var storedProcedureSQL = StoredProcedureSQL();
+            if (string.IsNullOrEmpty(storedProcedureSQL))
                 return result;
 
-            if (Settings.IsSqlCe)
-                return result;
-
-            if (IsAzure())
-                cmd.CommandText = StoredProcedureSQLAzure + SpecialQueryFlags();
-            else if (Settings.IncludeSynonyms)
-                cmd.CommandText = SynonymStoredProcedureSQLSetup + StoredProcedureSQL + SynonymStoredProcedureSQL +
-                                  SpecialQueryFlags();
-            else
-                cmd.CommandText = StoredProcedureSQL + SpecialQueryFlags();
-
-            cmd.CommandTimeout = Settings.CommandTimeout;
-
-            using (DbDataReader rdr = cmd.ExecuteReader())
+            using (var conn = _factory.CreateConnection())
             {
-                var lastSp = string.Empty;
-                StoredProcedure sp = null;
-                while (rdr.Read())
+                if (conn == null)
+                    return result;
+
+                conn.ConnectionString = Settings.ConnectionString;
+                conn.Open();
+
+                var cmd = GetCmd(conn);
+                if (cmd == null)
+                    return result;
+
+                if (Settings.IncludeSynonyms)
+                    cmd.CommandText = SynonymStoredProcedureSQLSetup() + storedProcedureSQL + SynonymStoredProcedureSQL() + SpecialQueryFlags();
+                else
+                    cmd.CommandText = storedProcedureSQL + SpecialQueryFlags();
+
+                cmd.CommandTimeout = Settings.CommandTimeout;
+
+                using (var rdr = cmd.ExecuteReader())
                 {
-                    var spType = rdr["ROUTINE_TYPE"].ToString().Trim().ToUpper();
-                    var isTVF = (spType == "FUNCTION");
-                    if (isTVF && !Settings.IncludeTableValuedFunctions)
-                        continue;
-
-                    string schema = rdr["SPECIFIC_SCHEMA"].ToString().Trim();
-                    if (Settings.SchemaFilterExclude != null && Settings.SchemaFilterExclude.IsMatch(schema))
-                        continue;
-
-                    string spName = rdr["SPECIFIC_NAME"].ToString().Trim();
-                    var fullname = schema + "." + spName;
-                    if (Settings.StoredProcedureFilterExclude != null &&
-                        (Settings.StoredProcedureFilterExclude.IsMatch(spName) ||
-                         Settings.StoredProcedureFilterExclude.IsMatch(fullname)))
-                        continue;
-
-                    if (lastSp != fullname || sp == null)
+                    var lastSp = string.Empty;
+                    StoredProcedure sp = null;
+                    while (rdr.Read())
                     {
-                        lastSp = fullname;
-                        sp = new StoredProcedure
-                        {
-                            IsTVF = isTVF,
-                            Name = spName,
-                            NameHumanCase = (Settings.UsePascalCase ? Inflector.ToTitleCase(spName) : spName)
-                                .Replace(" ", "").Replace("$", ""),
-                            Schema = schema
-                        };
-                        sp.NameHumanCase = CleanUp(sp.NameHumanCase);
-                        if ((string.Compare(schema, "dbo", StringComparison.OrdinalIgnoreCase) != 0) &&
-                            Settings.PrependSchemaName)
-                            sp.NameHumanCase = schema + "_" + sp.NameHumanCase;
-
-                        sp.NameHumanCase = Settings.StoredProcedureRename(sp);
-                        if (Settings.StoredProcedureFilterExclude != null &&
-                            (Settings.StoredProcedureFilterExclude.IsMatch(sp.NameHumanCase) ||
-                             Settings.StoredProcedureFilterExclude.IsMatch(schema + "." + sp.NameHumanCase)))
+                        var spType = rdr["ROUTINE_TYPE"].ToString().Trim().ToUpper();
+                        var isTvf = (spType == "FUNCTION");
+                        if (isTvf && !Settings.IncludeTableValuedFunctions)
                             continue;
 
-                        result.Add(sp);
-                    }
+                        var schema = rdr["SPECIFIC_SCHEMA"].ToString().Trim();
+                        if (Settings.SchemaFilterExclude != null && Settings.SchemaFilterExclude.IsMatch(schema))
+                            continue;
 
-                    if (rdr["DATA_TYPE"] != null && rdr["DATA_TYPE"] != DBNull.Value)
-                    {
-                        var typename = rdr["DATA_TYPE"].ToString().Trim().ToLower();
-                        var scale = (int)rdr["NUMERIC_SCALE"];
-                        var precision = (int)((byte)rdr["NUMERIC_PRECISION"]);
-                        var parameterMode = rdr["PARAMETER_MODE"].ToString().Trim().ToUpper();
+                        var spName = rdr["SPECIFIC_NAME"].ToString().Trim();
+                        var fullname = schema + "." + spName;
 
-                        var param = new StoredProcedureParameter
+                        if (Settings.StoredProcedureFilterExclude != null &&
+                            (Settings.StoredProcedureFilterExclude.IsMatch(spName) ||
+                             Settings.StoredProcedureFilterExclude.IsMatch(fullname)))
+                            continue;
+
+                        if (lastSp != fullname || sp == null)
                         {
-                            Ordinal = (int)rdr["ORDINAL_POSITION"],
-                            Mode = parameterMode == "IN"
-                                ? StoredProcedureParameterMode.In
-                                : StoredProcedureParameterMode.InOut,
-                            Name = rdr["PARAMETER_NAME"].ToString().Trim(),
-                            SqlDbType = GetStoredProcedureParameterDbType(typename),
-                            PropertyType = GetPropertyType(typename),
-                            DateTimePrecision = (short)rdr["DATETIME_PRECISION"],
-                            MaxLength = (int)rdr["CHARACTER_MAXIMUM_LENGTH"],
-                            Precision = precision,
-                            Scale = scale,
-                            UserDefinedTypeName = rdr["USER_DEFINED_TYPE"].ToString().Trim()
-                        };
+                            lastSp = fullname;
+                            sp = new StoredProcedure
+                            {
+                                IsTVF = isTvf,
+                                Name = spName,
+                                NameHumanCase = (Settings.UsePascalCase ? Inflector.ToTitleCase(spName) : spName)
+                                    .Replace(" ", "")
+                                    .Replace("$", ""),
+                                Schema = schema
+                            };
+                            sp.NameHumanCase = CleanUp(sp.NameHumanCase);
+                            if ((string.Compare(schema, "dbo", StringComparison.OrdinalIgnoreCase) != 0) && Settings.PrependSchemaName)
+                                sp.NameHumanCase = schema + "_" + sp.NameHumanCase;
 
-                        var clean = CleanUp(param.Name.Replace("@", ""));
-                        if (!string.IsNullOrEmpty(clean))
+                            sp.NameHumanCase = Settings.StoredProcedureRename(sp);
+                            if (Settings.StoredProcedureFilterExclude != null &&
+                                (Settings.StoredProcedureFilterExclude.IsMatch(sp.NameHumanCase) ||
+                                 Settings.StoredProcedureFilterExclude.IsMatch(schema + "." + sp.NameHumanCase)))
+                                continue;
+
+                            result.Add(sp);
+                        }
+
+                        if (rdr["DATA_TYPE"] != null && rdr["DATA_TYPE"] != DBNull.Value)
                         {
-                            param.NameHumanCase = Inflector.MakeInitialLower(
-                                (Settings.UsePascalCase ? Inflector.ToTitleCase(clean) : clean).Replace(" ", ""));
+                            var typename = rdr["DATA_TYPE"].ToString().Trim().ToLower();
+                            var scale = (int) rdr["NUMERIC_SCALE"];
+                            var precision = (int) ((byte) rdr["NUMERIC_PRECISION"]);
+                            var parameterMode = rdr["PARAMETER_MODE"].ToString().Trim().ToUpper();
 
-                            if (ReservedKeywords.Contains(param.NameHumanCase))
-                                param.NameHumanCase = "@" + param.NameHumanCase;
+                            var param = new StoredProcedureParameter
+                            {
+                                Ordinal = (int) rdr["ORDINAL_POSITION"],
+                                Mode = parameterMode == "IN"
+                                    ? StoredProcedureParameterMode.In
+                                    : StoredProcedureParameterMode.InOut,
+                                Name = rdr["PARAMETER_NAME"].ToString().Trim(),
+                                SqlDbType = GetStoredProcedureParameterDbType(typename),
+                                PropertyType = GetPropertyType(typename),
+                                DateTimePrecision = (short) rdr["DATETIME_PRECISION"],
+                                MaxLength = (int) rdr["CHARACTER_MAXIMUM_LENGTH"],
+                                Precision = precision,
+                                Scale = scale,
+                                UserDefinedTypeName = rdr["USER_DEFINED_TYPE"].ToString().Trim()
+                            };
 
-                            sp.Parameters.Add(param);
+                            var clean = CleanUp(param.Name.Replace("@", ""));
+                            if (!string.IsNullOrEmpty(clean))
+                            {
+                                param.NameHumanCase = Inflector.MakeInitialLower((Settings.UsePascalCase ? Inflector.ToTitleCase(clean) : clean).Replace(" ", ""));
+
+                                if (ReservedKeywords.Contains(param.NameHumanCase))
+                                    param.NameHumanCase = "@" + param.NameHumanCase;
+
+                                sp.Parameters.Add(param);
+                            }
                         }
                     }
                 }
@@ -514,6 +535,8 @@ namespace Scratch.SchemaReaders
 
         public void ReadStoredProcReturnObject(SqlConnection sqlConnection, StoredProcedure proc)
         {
+            //TODO: Change SQL for different databases
+
             try
             {
                 const string structured = "Structured";
@@ -633,9 +656,7 @@ namespace Scratch.SchemaReaders
                         continue;
                 }
 
-                var pkCols = foreignKeys.Select(x =>
-                        pkTable.Columns.Find(n =>
-                            string.Equals(n.Name, x.PkColumn, StringComparison.InvariantCultureIgnoreCase)))
+                var pkCols = foreignKeys.Select(x => pkTable.Columns.Find(n => string.Equals(n.Name, x.PkColumn, StringComparison.InvariantCultureIgnoreCase)))
                     .Where(x => x != null)
                     .OrderBy(o => o.Ordinal)
                     .ToList();
@@ -656,16 +677,13 @@ namespace Scratch.SchemaReaders
                 var fkCol = fkCols.First();
                 var pkCol = pkCols.First();
 
-                foreignKey =
-                    Settings.ForeignKeyProcessing(foreignKeys, fkTable, pkTable, fkCols.Any(x => x.col.IsNullable));
+                foreignKey = Settings.ForeignKeyProcessing(foreignKeys, fkTable, pkTable, fkCols.Any(x => x.col.IsNullable));
 
-                string pkTableHumanCaseWithSuffix = foreignKey.PkTableHumanCase(pkTable.Suffix);
-                string pkTableHumanCase = foreignKey.PkTableHumanCase(null);
-                string pkPropName = fkTable.GetUniqueColumnName(pkTableHumanCase, foreignKey, checkForFkNameClashes, true,
-                    Relationship.ManyToOne);
-                bool fkMakePropNameSingular = (relationship == Relationship.OneToOne);
-                string fkPropName = pkTable.GetUniqueColumnName(fkTable.NameHumanCase, foreignKey, checkForFkNameClashes,
-                    fkMakePropNameSingular, Relationship.OneToMany);
+                var pkTableHumanCaseWithSuffix = foreignKey.PkTableHumanCase(pkTable.Suffix);
+                var pkTableHumanCase = foreignKey.PkTableHumanCase(null);
+                var pkPropName = fkTable.GetUniqueColumnName(pkTableHumanCase, foreignKey, checkForFkNameClashes, true, Relationship.ManyToOne);
+                var fkMakePropNameSingular = (relationship == Relationship.OneToOne);
+                var fkPropName = pkTable.GetUniqueColumnName(fkTable.NameHumanCase, foreignKey, checkForFkNameClashes, fkMakePropNameSingular, Relationship.OneToMany);
 
                 var dataAnnotation = string.Empty;
                 if (Settings.UseDataAnnotations)
@@ -692,12 +710,14 @@ namespace Scratch.SchemaReaders
                 var fkd = new PropertyAndComments
                 {
                     AdditionalDataAnnotations = Settings.ForeignKeyAnnotationsProcessing(fkTable, pkTable, pkPropName),
+
                     Definition = string.Format("{0}public {1}{2} {3} {4}{5}", dataAnnotation,
                         Table.GetLazyLoadingMarker(),
                         pkTableHumanCaseWithSuffix,
                         pkPropName,
                         "{ get; set; }",
                         Settings.IncludeComments != CommentsStyle.None ? " // " + foreignKey.ConstraintName : string.Empty),
+
                     Comments = string.Format("Parent {0} pointed by [{1}].({2}) ({3})",
                         pkTableHumanCase,
                         fkTable.Name,
@@ -711,6 +731,7 @@ namespace Scratch.SchemaReaders
                 {
                     manyToManyMapping = string.Format("c => new {{ {0} }}",
                         string.Join(", ", fkCols.Select(x => "c." + x.col.NameHumanCase).Distinct().ToArray()));
+
                     mapKey = string.Format("{0}",
                         string.Join(",", fkCols.Select(x => "\"" + x.col.Name + "\"").Distinct().ToArray()));
                 }
@@ -740,21 +761,19 @@ namespace Scratch.SchemaReaders
         {
             foreach (var foreignKey in fkList)
             {
-                Table fkTable = tables.GetTable(foreignKey.FkTableName, foreignKey.FkSchema);
+                var fkTable = tables.GetTable(foreignKey.FkTableName, foreignKey.FkSchema);
                 if (fkTable == null)
                     continue; // Could be filtered out
 
-                Table pkTable = tables.GetTable(foreignKey.PkTableName, foreignKey.PkSchema);
+                var pkTable = tables.GetTable(foreignKey.PkTableName, foreignKey.PkSchema);
                 if (pkTable == null)
                     continue; // Could be filtered out
 
-                Column fkCol = fkTable.Columns.Find(n =>
-                    string.Equals(n.Name, foreignKey.FkColumn, StringComparison.InvariantCultureIgnoreCase));
+                var fkCol = fkTable.Columns.Find(n => string.Equals(n.Name, foreignKey.FkColumn, StringComparison.InvariantCultureIgnoreCase));
                 if (fkCol == null)
                     continue; // Could not find fk column
 
-                Column pkCol = pkTable.Columns.Find(n =>
-                    string.Equals(n.Name, foreignKey.PkColumn, StringComparison.InvariantCultureIgnoreCase));
+                var pkCol = pkTable.Columns.Find(n => string.Equals(n.Name, foreignKey.PkColumn, StringComparison.InvariantCultureIgnoreCase));
                 if (pkCol == null)
                     continue; // Could not find pk column
 
@@ -833,12 +852,12 @@ namespace Scratch.SchemaReaders
             // This relationship has multiple composite keys
 
             // childTable FK columns are exactly the primary key (they are part of primary key, and no other columns are primary keys) //TODO: we could also check if they are an unique index
-            bool childTableColumnsAllPrimaryKeys =
+            var childTableColumnsAllPrimaryKeys =
                 (childTableCols.Count == childTableCols.Count(x => x.IsPrimaryKey)) &&
                 (childTableCols.Count == childTable.PrimaryKeys.Count());
 
             // parentTable columns are exactly the primary key (they are part of primary key, and no other columns are primary keys) //TODO: we could also check if they are an unique index
-            bool parentTableColumnsAllPrimaryKeys =
+            var parentTableColumnsAllPrimaryKeys =
                 (parentTableCols.Count == parentTableCols.Count(x => x.IsPrimaryKey)) &&
                 (parentTableCols.Count == parentTable.PrimaryKeys.Count());
 
@@ -872,7 +891,7 @@ namespace Scratch.SchemaReaders
             if (rdr == null)
                 throw new ArgumentNullException("rdr");
 
-            string typename = rdr["TypeName"].ToString().Trim().ToLower();
+            var typename = rdr["TypeName"].ToString().Trim().ToLower();
             var scale = (int)rdr["Scale"];
             var precision = (int)rdr["Precision"];
 
@@ -958,7 +977,7 @@ namespace Scratch.SchemaReaders
             _generatedTextTransformation.WriteLine(o);
         }
 
-        protected bool IsFilterExcluded(Regex filterExclude, Regex filterInclude, string name)
+        private bool IsFilterExcluded(Regex filterExclude, Regex filterInclude, string name)
         {
             if (filterExclude != null && filterExclude.IsMatch(name))
                 return true;
@@ -1021,18 +1040,18 @@ namespace Scratch.SchemaReaders
 
         private static readonly Regex RxCleanUp = new Regex(@"[^\w\d\s_-]", RegexOptions.Compiled);
 
-        protected static readonly Func<string, string> CleanUp = (str) =>
+        private static readonly Func<string, string> CleanUp = (str) =>
         {
             // Replace punctuation and symbols in variable names as these are not allowed.
-            int len = str.Length;
+            var len = str.Length;
             if (len == 0)
                 return str;
 
             var sb = new StringBuilder();
-            bool replacedCharacter = false;
+            var replacedCharacter = false;
             for (int n = 0; n < len; ++n)
             {
-                char c = str[n];
+                var c = str[n];
                 if (c != '_' && c != '-' && (char.IsSymbol(c) || char.IsPunctuation(c)))
                 {
                     int ascii = c;
