@@ -402,7 +402,7 @@ namespace Scratch.SchemaReaders
                     if (string.IsNullOrEmpty(column))
                     {
                         // Table level extended comment
-                        t.ExtendedProperty = Regex.Replace(extendedProperty, "[\r\n]+", "\r\n    /// ");
+                        t.ExtendedProperty.Add(Regex.Replace(extendedProperty, "[\r\n]+", "\r\n    /// "));
                         continue;
                     }
 

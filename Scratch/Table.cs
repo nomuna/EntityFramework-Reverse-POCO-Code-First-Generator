@@ -12,7 +12,7 @@ namespace Scratch
         public string Type;
         public string ClassName;
         public string Suffix;
-        public string ExtendedProperty;
+        public List<string> ExtendedProperty;
         public bool IsMapping;
         public bool IsView;
         public bool HasForeignKey;
@@ -33,6 +33,7 @@ namespace Scratch
             ResetNavigationProperties();
             ReverseNavigationUniquePropNameClashes = new List<string>();
             DataAnnotations = new List<string>();
+            ExtendedProperty = new List<string>();
         }
 
         internal static string GetLazyLoadingMarker()
