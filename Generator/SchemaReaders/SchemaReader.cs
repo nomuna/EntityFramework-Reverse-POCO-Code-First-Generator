@@ -34,6 +34,9 @@ namespace Generator.SchemaReaders
         protected abstract string GetStoredProcedureParameterDbType(string sqlType);
         protected abstract string GetPropertyType(string dbType);
 
+        // Any special setup required
+        public abstract void Init();
+
 
         private readonly DbProviderFactory _factory;
         private readonly GeneratedTextTransformation _generatedTextTransformation;
@@ -86,15 +89,6 @@ namespace Generator.SchemaReaders
 
                 conn.ConnectionString = Settings.ConnectionString;
                 conn.Open();
-
-                var t = conn.GetType();
-                var tname = t.Name.ToLower();
-                if(tname == "sqlceconnection")
-                    Settings.IsSqlCe = true;
-
-                if (Settings.IsSqlCe)
-                    Settings.PrependSchemaName = false;
-
 
                 var cmd = GetCmd(conn);
                 if (cmd == null)
@@ -192,15 +186,16 @@ namespace Generator.SchemaReaders
 
                 ReadIndexes(conn, result);
 
-                foreach (var tbl in result)
-                {
-                    tbl.SetPrimaryKeys();
-                    foreach (var c in tbl.Columns)
-                        Settings.UpdateColumn(c, tbl);
-                    tbl.Columns.ForEach(x => x.SetupEntityAndConfig());
-                }
-
                 conn.Close();
+            }
+
+            //todo move this to the writer class
+            foreach (var tbl in result)
+            {
+                tbl.SetPrimaryKeys();
+                foreach (var c in tbl.Columns)
+                    Settings.UpdateColumn(c, tbl);
+                tbl.Columns.ForEach(x => x.SetupEntityAndConfig());
             }
 
             return result;
@@ -459,11 +454,11 @@ namespace Generator.SchemaReaders
                             continue;
 
                         var schema = rdr["SPECIFIC_SCHEMA"].ToString().Trim();
-                        if (Settings.SchemaFilterExclude != null && Settings.SchemaFilterExclude.IsMatch(schema))
+                        if (IsFilterExcluded(Settings.SchemaFilterExclude, Settings.SchemaFilterInclude, schema))
                             continue;
 
                         var spName = rdr["SPECIFIC_NAME"].ToString().Trim();
-                        var fullname = schema + "." + spName;
+                        var fullname = string.Format("{0}.{1}", schema, spName);
 
                         if (Settings.StoredProcedureFilterExclude != null &&
                             (Settings.StoredProcedureFilterExclude.IsMatch(spName) ||
@@ -473,6 +468,7 @@ namespace Generator.SchemaReaders
                         if (lastSp != fullname || sp == null)
                         {
                             lastSp = fullname;
+
                             sp = new StoredProcedure
                             {
                                 IsTVF = isTvf,
@@ -482,14 +478,25 @@ namespace Generator.SchemaReaders
                                     .Replace("$", string.Empty),
                                 Schema = schema
                             };
+
                             sp.NameHumanCase = CleanUp(sp.NameHumanCase);
                             if ((string.Compare(schema, "dbo", StringComparison.OrdinalIgnoreCase) != 0) && Settings.PrependSchemaName)
                                 sp.NameHumanCase = schema + "_" + sp.NameHumanCase;
 
                             sp.NameHumanCase = Settings.StoredProcedureRename(sp);
+                            fullname = string.Format("{0}.{1}", schema, sp.NameHumanCase);
+
                             if (Settings.StoredProcedureFilterExclude != null &&
                                 (Settings.StoredProcedureFilterExclude.IsMatch(sp.NameHumanCase) ||
-                                 Settings.StoredProcedureFilterExclude.IsMatch(schema + "." + sp.NameHumanCase)))
+                                 Settings.StoredProcedureFilterExclude.IsMatch(fullname)))
+                                continue;
+
+                            if (Settings.StoredProcedureFilterInclude != null &&
+                                !(Settings.StoredProcedureFilterInclude.IsMatch(sp.NameHumanCase) ||
+                                  Settings.StoredProcedureFilterInclude.IsMatch(fullname)))
+                                continue;
+
+                            if (!Settings.StoredProcedureFilter(sp))
                                 continue;
 
                             result.Add(sp);
@@ -988,7 +995,7 @@ namespace Generator.SchemaReaders
             return false;
         }
 
-        private static readonly Func<string, string> ToDisplayName = (str) =>
+        public static string ToDisplayName(string str)
         {
             if (string.IsNullOrEmpty(str))
                 return string.Empty;
@@ -1036,9 +1043,9 @@ namespace Generator.SchemaReaders
             str = Regex.Replace(str, @"\s+", " ").Trim(); // Multiple white space to one space
             str = Regex.Replace(str, @"\bid\b", "ID"); //  Make ID word uppercase
             return str;
-        };
+        }
 
-        private static readonly Regex RxCleanUp = new Regex(@"[^\w\d\s_-]", RegexOptions.Compiled);
+        private static readonly Regex RemoveNonAlphanumerics = new Regex(@"[^\w\d\s_-]", RegexOptions.Compiled);
 
         public static readonly Func<string, string> CleanUp = (str) =>
         {
@@ -1064,20 +1071,11 @@ namespace Generator.SchemaReaders
             if (replacedCharacter)
                 str = sb.ToString();
 
-            // Remove non alphanumerics
-            str = RxCleanUp.Replace(str, string.Empty);
+            str = RemoveNonAlphanumerics.Replace(str, string.Empty);
             if (char.IsDigit(str[0]))
                 str = "C" + str;
 
             return str;
         };
-
-        protected static void ArgumentNotNull<T>(T arg, string name) where T : class
-        {
-            if (arg == null)
-            {
-                throw new ArgumentNullException(name);
-            }
-        }
     }
 }

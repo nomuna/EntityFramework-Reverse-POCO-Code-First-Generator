@@ -1,65 +1,41 @@
-﻿using System;
-using System.Text;
-using System.Text.RegularExpressions;
+﻿using Generator.SchemaReaders;
 using NUnit.Framework;
 
 namespace Generator.Tests.Unit
 {
-    public class ToDisplayNameTests
+    [TestFixture]
+    public class SchemaReaderTests
     {
-        // This class should exactly match the code in EF.Reverse.POCO.Core.ttinclude
-        private static readonly Func<string, string> ToDisplayName = (str) =>
+        [Test]
+        [TestCase("HelloWorldTest", "HelloWorldTest", true)]
+        [TestCase("Hello_World_Test", "HelloWorldTest", true)]
+        [TestCase("Hello-World-Test", "HelloWorldTest", true)]
+        [TestCase("Hello World Test", "HelloWorldTest", true)]
+        [TestCase("hello world test", "HelloWorldTest", true)]
+        [TestCase("HelloWORLD", "HelloWorld", true)]
+        [TestCase("Helloworld", "Helloworld", true)]
+        [TestCase("helloworld", "Helloworld", true)]
+        [TestCase("HELLOWORLD", "Helloworld", true)]
+
+        [TestCase("HelloWorldTest", "HelloWorldTest", false)]
+        [TestCase("Hello_World_Test", "Hello_World_Test", false)]
+        [TestCase("Hello-World-Test", "Hello-World-Test", false)]
+        [TestCase("Hello World Test", "HelloWorldTest", false)]
+        [TestCase("Hello world test", "Helloworldtest", false)]
+        [TestCase("HelloWORLD", "HelloWORLD", false)]
+        [TestCase("Helloworld", "Helloworld", false)]
+        [TestCase("helloworld", "helloworld", false)]
+        [TestCase("HELLOWORLD", "HELLOWORLD", false)]
+        public void Test(string test, string expected, bool useCamelCase)
         {
-            if (string.IsNullOrEmpty(str))
-                return string.Empty;
+            // Act
+            var clean = SchemaReader.CleanUp(test);
+            var singular = clean;
+            var nameHumanCase = (useCamelCase ? Inflector.ToTitleCase(singular) : singular).Replace(" ", "").Replace("$", "").Replace(".", "");
 
-            var sb = new StringBuilder();
-            Console.WriteLine(str);
-            str = Regex.Replace(str, @"[^a-zA-Z0-9]", " "); // Anything that is not a letter or digit, convert to a space
-            str = Regex.Replace(str, @"[A-Z]{2,}", " $+ "); // Any word that is upper case
-            Console.WriteLine(str);
-
-            var hasUpperCased = false;
-            var lastChar = '\0';
-            foreach (var original in str.Trim())
-            {
-                var c = original;
-                if (lastChar == '\0')
-                {
-                    c = char.ToUpperInvariant(original);
-                }
-                else
-                {
-                    var isLetter = char.IsLetter(original);
-                    var isDigit = char.IsDigit(original);
-                    var isWhiteSpace = !isLetter && !isDigit;
-
-                    // Is this char is different to last time
-                    var isDifferent = false;
-                    if (isLetter && !char.IsLetter(lastChar))
-                        isDifferent = true;
-                    else if (isDigit && !char.IsDigit(lastChar))
-                        isDifferent = true;
-                    else if (char.IsUpper(original) && !char.IsUpper(lastChar))
-                        isDifferent = true;
-
-                    if (isDifferent || isWhiteSpace)
-                        sb.Append(' '); // Add a space
-
-                    if (hasUpperCased && isLetter)
-                        c = char.ToLowerInvariant(original);
-                }
-                lastChar = original;
-                if (!hasUpperCased && char.IsUpper(c))
-                    hasUpperCased = true;
-                sb.Append(c);
-            }
-            str = sb.ToString();
-            Console.WriteLine(str);
-            str = Regex.Replace(str, @"\s+", " ").Trim(); // Multiple white space to one space
-            str = Regex.Replace(str, @"\bid\b", "ID"); //  Make ID word uppercase
-            return str;
-        };
+            // Assert
+            Assert.AreEqual(expected, nameHumanCase);
+        }
 
         [Test]
         [TestCase("HelloWorldTest", "Hello world test")]
@@ -108,7 +84,7 @@ namespace Generator.Tests.Unit
         [TestCase("Some id", "Some ID")]
         public void DisplayName(string test, string expected)
         {
-            var displayName = ToDisplayName(test);
+            var displayName = SchemaReader.ToDisplayName(test);
 
             // Assert
             Assert.AreEqual(expected, displayName);

@@ -9,6 +9,11 @@ namespace Generator
     {
         private Generator _generator;
 
+        public Generator Generator
+        {
+            get { return _generator; }
+        }
+
         public void Init()
         {
             _generator = new Generator(this);
@@ -49,7 +54,7 @@ namespace Generator
             }
             catch (Exception x)
             {
-                var error = FormatError(x);
+                var error = Generator.FormatError(x);
                 Warning(string.Format("Failed to load provider \"{0}\" - {1}", Settings.ProviderName, error));
                 WriteLine(string.Empty);
                 WriteLine("// ------------------------------------------------------------------------------------------------");
@@ -63,20 +68,15 @@ namespace Generator
         {
             try
             {
-                Settings.Tables = _generator.LoadTables();
-                Settings.StoredProcs = _generator.LoadStoredProcs();
+                _generator.LoadTables();
+                _generator.LoadStoredProcs();
             }
             catch (Exception x)
             {
-                var error = FormatError(x);
+                var error = Generator.FormatError(x);
                 Warning(string.Format("Failed to read the schema information. Error: {0}", error));
                 WriteLine(string.Empty);
             }
-        }
-
-        private static string FormatError(Exception ex)
-        {
-            return ex.Message.Replace("\r\n", "\n").Replace("\n", " ");
         }
 
         private string ZapPassword()

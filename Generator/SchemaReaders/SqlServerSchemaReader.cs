@@ -1039,5 +1039,10 @@ SELECT  SERVERPROPERTY('Edition') AS Edition,
             }
             return sysType;
         }
+
+        public override void Init()
+        {
+            throw new System.NotImplementedException();
+        }
     }
 }

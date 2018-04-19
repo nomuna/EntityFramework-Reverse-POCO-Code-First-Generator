@@ -372,5 +372,11 @@ WHERE   TABLE_NAME = '__ExtendedProperties'";
             }
             return sysType;
         }
+
+        public override void Init()
+        {
+            Settings.IsSqlCe = true;
+            Settings.PrependSchemaName = false;
+        }
     }
 }

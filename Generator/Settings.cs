@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
 
@@ -37,6 +36,8 @@ namespace Generator
             get { return _defaultConstructorArgument ?? string.Format('"' + "Name={0}" + '"', ConnectionStringName); }
             set { _defaultConstructorArgument = value; }
         }
+
+        public static bool IsSqlCe { get; set; } // todo delete
 
         public static string ConfigurationClassName = "Configuration"; // Configuration, Mapping, Map, etc. This is appended to the Poco class name to configure the mappings.
         public static string[] FilenameSearchOrder = new[] { "app.config", "web.config" }; // Add more here if required. The config files are searched for in the local project first, then the whole solution second.
@@ -163,6 +164,7 @@ namespace Generator
         public static Regex SchemaFilterInclude = null;
         public static Regex TableFilterExclude = null;
         public static Regex TableFilterInclude = null;
+        public static Regex ColumnFilterExclude = null;
 
         // Filtering of tables using a function. This can be used in conjunction with the Regex's above.
         // Regex are used first to filter the list down, then this function is run last.
@@ -225,6 +227,7 @@ namespace Generator
         // As long as the type can be mapped to your new type, all is well.
         //Settings.EnumDefinitions.Add(new EnumDefinition { Schema = "dbo", Table = "match_table_name", Column = "match_column_name", EnumType = "name_of_enum" });
         //Settings.EnumDefinitions.Add(new EnumDefinition { Schema = "dbo", Table = "OrderHeader", Column = "OrderStatus", EnumType = "OrderStatusType" }); // This will replace OrderHeader.OrderStatus type to be an OrderStatusType enum
+        public static List<EnumDefinition> EnumDefinitions = new List<EnumDefinition>();
 
         // Use the following function if you need to apply additional modifications to a column
         // eg. normalise names etc.
@@ -256,7 +259,7 @@ namespace Generator
             // This will create: public override long id { get; set; }
 
             // Perform Enum property type replacement
-            var enumDefinition = Settings.EnumDefinitions.FirstOrDefault(e =>
+            var enumDefinition = EnumDefinitions.FirstOrDefault(e =>
                 (e.Schema.Equals(table.Schema, StringComparison.InvariantCultureIgnoreCase)) &&
                 (e.Table.Equals(table.Name, StringComparison.InvariantCultureIgnoreCase) || e.Table.Equals(table.NameHumanCase, StringComparison.InvariantCultureIgnoreCase)) &&
                 (e.Column.Equals(column.Name, StringComparison.InvariantCultureIgnoreCase) || e.Column.Equals(column.NameHumanCase, StringComparison.InvariantCultureIgnoreCase)));
@@ -271,33 +274,160 @@ namespace Generator
             return column;
         };
 
-        todo rest of file---------------------
+        // StoredProcedure renaming ************************************************************************************************************
+        // Use the following function to rename stored procs such as sp_CreateOrderHistory to CreateOrderHistory, my_sp_shipments to Shipments, etc.
+        // Example:
+        /*Settings.StoredProcedureRename = (sp) =>
+        {
+            if (sp.NameHumanCase.StartsWith("sp_"))
+                return sp.NameHumanCase.Remove(0, 3);
+            return sp.NameHumanCase.Replace("my_sp_", "");
+        };*/
+        public static Func<StoredProcedure, string> StoredProcedureRename = (sp) => sp.NameHumanCase;   // Do nothing by default
 
+        // Use the following function to rename the return model automatically generated for stored procedure.
+        // By default it's <proc_name>ReturnModel.
+        // Example:
+        /*Settings.StoredProcedureReturnModelRename = (name, sp) =>
+        {
+            if (sp.NameHumanCase.Equals("ComputeValuesForDate", StringComparison.InvariantCultureIgnoreCase))
+                return "ValueSet";
+            if (sp.NameHumanCase.Equals("SalesByYear", StringComparison.InvariantCultureIgnoreCase))
+                return "SalesSet";
 
+            return name;
+        };*/
+        public static Func<string, StoredProcedure, string> StoredProcedureReturnModelRename = (name, sp) => name; // Do nothing by default
 
-        public static Func<Table, bool> ConfigurationFilter;
+        // StoredProcedure return types *******************************************************************************************************
+        // Override generation of return models for stored procedures that return entities.
+        // If a stored procedure returns an entity, add it to the list below.
+        // This will suppress the generation of the return model, and instead return the entity.
+        // Example:                       Proc name      Return this entity type instead
+        //StoredProcedureReturnTypes.Add("SalesByYear", "SummaryOfSalesByYear");
         public static Dictionary<string, string> StoredProcedureReturnTypes = new Dictionary<string, string>();
-        public static Regex ColumnFilterExclude;
-        public static string ConfigFilePath;
-        public static Func<StoredProcedure, string> StoredProcedureRename;
-        public static Func<string, StoredProcedure, string> StoredProcedureReturnModelRename;
-        public static Func<IList<ForeignKey>, Table, Table, bool, ForeignKey> ForeignKeyProcessing;
-        public static Func<Table, Table, string, string[]> ForeignKeyAnnotationsProcessing;
-        public static Func<ForeignKey, ForeignKey> ForeignKeyFilter;
-        public static Func<string, ForeignKey, string, Relationship, short, string> ForeignKeyName;
 
-        public static List<EnumDefinition> EnumDefinitions = new List<EnumDefinition>();
-        public static Tables Tables;
-        public static List<StoredProcedure> StoredProcs;
+        public static Func<ForeignKey, ForeignKey> ForeignKeyFilter = (ForeignKey fk) =>
+        {
+            // Return null to exclude this foreign key, or set IncludeReverseNavigation = false
+            // to include the foreign key but not generate reverse navigation properties.
+            // Example, to exclude all foreign keys for the Categories table, use:
+            // if (fk.PkTableName == "Categories")
+            //    return null;
+
+            // Example, to exclude reverse navigation properties for tables ending with Type, use:
+            // if (fk.PkTableName.EndsWith("Type"))
+            //    fk.IncludeReverseNavigation = false;
+
+            return fk;
+        };
+
+        public static Func<IList<ForeignKey>, Table, Table, bool, ForeignKey> ForeignKeyProcessing = (foreignKeys, fkTable, pkTable, anyNullableColumnInForeignKey) =>
+        {
+            var foreignKey = foreignKeys.First();
+
+            // If using data annotations and to include the [Required] attribute in the foreign key, enable the following
+            //if (!anyNullableColumnInForeignKey)
+            //   foreignKey.IncludeRequiredAttribute = true;
+
+            return foreignKey;
+        };
+
+        public static Func<string, ForeignKey, string, Relationship, short, string> ForeignKeyName = (tableName, foreignKey, foreignKeyName, relationship, attempt) =>
+        {
+            string fkName;
+
+            // 5 Attempts to correctly name the foreign key
+            switch (attempt)
+            {
+                case 1:
+                    // Try without appending foreign key name
+                    fkName = tableName;
+                    break;
+
+                case 2:
+                    // Only called if foreign key name ends with "id"
+                    // Use foreign key name without "id" at end of string
+                    fkName = foreignKeyName.Remove(foreignKeyName.Length - 2, 2);
+                    break;
+
+                case 3:
+                    // Use foreign key name only
+                    fkName = foreignKeyName;
+                    break;
+
+                case 4:
+                    // Use table name and foreign key name
+                    fkName = tableName + "_" + foreignKeyName;
+                    break;
+
+                case 5:
+                    // Used in for loop 1 to 99 to append a number to the end
+                    fkName = tableName;
+                    break;
+
+                default:
+                    // Give up
+                    fkName = tableName;
+                    break;
+            }
+
+            // Apply custom foreign key renaming rules. Can be useful in applying pluralization.
+            // For example:
+            /*if (tableName == "Employee" && foreignKey.FkColumn == "ReportsTo")
+                return "Manager";
+
+            if (tableName == "Territories" && foreignKey.FkTableName == "EmployeeTerritories")
+                return "Locations";
+
+            if (tableName == "Employee" && foreignKey.FkTableName == "Orders" && foreignKey.FkColumn == "EmployeeID")
+                return "ContactPerson";
+            */
+
+            // FK_TableName_FromThisToParentRelationshipName_FromParentToThisChildsRelationshipName
+            // (e.g. FK_CustomerAddress_Customer_Addresses will extract navigation properties "address.Customer" and "customer.Addresses")
+            // Feel free to use and change the following
+            /*if (foreignKey.ConstraintName.StartsWith("FK_") && foreignKey.ConstraintName.Count(x => x == '_') == 3)
+            {
+                var parts = foreignKey.ConstraintName.Split('_');
+                if (!string.IsNullOrWhiteSpace(parts[2]) && !string.IsNullOrWhiteSpace(parts[3]) && parts[1] == foreignKey.FkTableName)
+                {
+                    if (relationship == Relationship.OneToMany)
+                        fkName = parts[3];
+                    else if (relationship == Relationship.ManyToOne)
+                        fkName = parts[2];
+                }
+            }*/
+
+            return fkName;
+        };
+
+        public static Func<Table, Table, string, string[]> ForeignKeyAnnotationsProcessing = (Table fkTable, Table pkTable, string propName) =>
+        {
+            /* Example:
+            // Each navigation property that is a reference to User are left intact
+            if (pkTable.NameHumanCase.Equals("User") && propName.Equals("User"))
+                return null;
+
+            // all the others are marked with this attribute
+            return new[] { "System.Runtime.Serialization.IgnoreDataMember" };
+            */
+
+            return null;
+        };
+
+        // Return true to include this table in the db context
+        public static Func<Table, bool> ConfigurationFilter = (Table t) =>
+        {
+            return true;
+        };
 
         public static string FileExtension = ".cs";
+        public static float TargetFrameworkVersion = 4.5f;
 
-        public static float TargetFrameworkVersion;
-        public static Func<string, bool> IsSupportedFrameworkVersion = (string frameworkVersion) =>
-        {
-            var nfi = CultureInfo.InvariantCulture.NumberFormat;
-            var isSupported = float.Parse(frameworkVersion, nfi);
-            return isSupported <= TargetFrameworkVersion;
-        };
+        // That's it, nothing else to configure ***********************************************************************************************
+
+
+        public static string ConfigFilePath;
     };
 }

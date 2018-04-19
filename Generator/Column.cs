@@ -291,7 +291,7 @@ namespace Generator
 
         public void CleanUpDefault()
         {
-            if (String.IsNullOrWhiteSpace(Default))
+            if (string.IsNullOrWhiteSpace(Default))
             {
                 Default = string.Empty;
                 return;
@@ -311,8 +311,8 @@ namespace Generator
             if (Default.First() == '\'' && Default.Last() == '\'' && Default.Length >= 2)
                 Default = string.Format("\"{0}\"", Default.Substring(1, Default.Length - 2));
 
-            string lower = Default.ToLower();
-            string lowerPropertyType = PropertyType.ToLower();
+            var lower = Default.ToLower();
+            var lowerPropertyType = PropertyType.ToLower();
 
             // Cleanup default
             switch (lowerPropertyType)
@@ -366,7 +366,7 @@ namespace Generator
                 return;
             }
 
-            if (String.IsNullOrWhiteSpace(Default))
+            if (string.IsNullOrWhiteSpace(Default))
             {
                 Default = string.Empty;
                 return;
@@ -377,19 +377,19 @@ namespace Generator
             {
                 case "long":
                     long l;
-                    if (!Int64.TryParse(Default, out l))
+                    if (!long.TryParse(Default, out l))
                         Default = string.Empty;
                     break;
 
                 case "short":
                     short s;
-                    if (!Int16.TryParse(Default, out s))
+                    if (!short.TryParse(Default, out s))
                         Default = string.Empty;
                     break;
 
                 case "int":
                     int i;
-                    if (!Int32.TryParse(Default, out i))
+                    if (!int.TryParse(Default, out i))
                         Default = string.Empty;
                     break;
 
@@ -430,7 +430,7 @@ namespace Generator
 
                 case "double":
                     double d;
-                    if (!Double.TryParse(Default, out d))
+                    if (!double.TryParse(Default, out d))
                         Default = string.Empty;
                     if (Default.ToLowerInvariant().EndsWith("."))
                         Default += "0";
@@ -438,7 +438,7 @@ namespace Generator
 
                 case "float":
                     float f;
-                    if (!Single.TryParse(Default, out f))
+                    if (!float.TryParse(Default, out f))
                         Default = string.Empty;
                     if (!Default.ToLowerInvariant().EndsWith("f"))
                         Default += "f";
@@ -446,7 +446,7 @@ namespace Generator
 
                 case "decimal":
                     decimal dec;
-                    if (!Decimal.TryParse(Default, out dec))
+                    if (!decimal.TryParse(Default, out dec))
                         Default = string.Empty;
                     else
                         Default += "m";
@@ -454,13 +454,13 @@ namespace Generator
 
                 case "byte":
                     byte b;
-                    if (!Byte.TryParse(Default, out b))
+                    if (!byte.TryParse(Default, out b))
                         Default = string.Empty;
                     break;
 
                 case "bool":
                     bool x;
-                    if (!Boolean.TryParse(Default, out x))
+                    if (!bool.TryParse(Default, out x))
                         Default = string.Empty;
                     break;
 

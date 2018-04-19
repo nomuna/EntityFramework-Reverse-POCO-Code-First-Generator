@@ -27,7 +27,7 @@ namespace Generator
                 var x = new GeneratedTextTransformation();
                 x.Init();
                 x.ReadSchema();
-                foreach (var table in Settings.Tables.Where(t => !t.IsMapping))
+                foreach (var table in x.Generator.Tables.Where(t => !t.IsMapping))
                 {
                     Console.WriteLine(table.NameHumanCase);
                     sw.WriteLine(table.NameHumanCase);
@@ -72,7 +72,7 @@ namespace Generator
                         Console.WriteLine();
 
                     var fks = table.Columns.Where(col => col.ConfigFk.Any()).ToList();
-                    if (fks.Count > 0)
+                    if (fks.Count() > 0)
                         Console.WriteLine("  // FK's");
                     foreach (var col in fks)
                     {

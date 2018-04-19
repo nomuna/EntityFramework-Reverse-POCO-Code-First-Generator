@@ -59,7 +59,6 @@
     <Compile Include="Column.cs" />
     <Compile Include="CommentsStyle.cs" />
     <Compile Include="DatabaseType.cs" />
-    <Compile Include="EfConstants.cs" />
     <Compile Include="Elements.cs" />
     <Compile Include="EnumDefinition.cs" />
     <Compile Include="ForeignKey.cs" />
@@ -91,6 +90,9 @@
     <Compile Include="StoredProcedureParameterMode.cs" />
     <Compile Include="Table.cs" />
     <Compile Include="Tables.cs" />
+    <Compile Include="Writer\Writer.cs" />
+    <Compile Include="Writer\WriterEf6.cs" />
+    <Compile Include="Writer\WriterEfCore.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config">

@@ -88,5 +88,10 @@ namespace Generator.SchemaReaders
         {
             return string.Empty;
         }
+
+        public override void Init()
+        {
+            throw new System.NotImplementedException();
+        }
     }
 }
