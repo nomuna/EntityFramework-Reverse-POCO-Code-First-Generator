@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
 
 namespace Generator
 {
@@ -69,224 +68,14 @@ namespace Generator
             EntityFk = new List<PropertyAndComments>();
         }
 
-        private void SetupEntity()
-        {
-            var comments = string.Empty;
-            if (Settings.IncludeComments != CommentsStyle.None)
-            {
-                comments = Name;
-                if (IsPrimaryKey)
-                {
-                    if (IsUniqueConstraint)
-                        comments += " (Primary key via unique index " + UniqueIndexName + ")";
-                    else
-                        comments += " (Primary key)";
-                }
-
-                if (MaxLength > 0)
-                    comments += string.Format(" (length: {0})", MaxLength);
-            }
-
-            var inlineComments = Settings.IncludeComments == CommentsStyle.AtEndOfField ? " // " + comments : string.Empty;
-
-            SummaryComments = string.Empty;
-            if (Settings.IncludeComments == CommentsStyle.InSummaryBlock && !string.IsNullOrEmpty(comments))
-            {
-                SummaryComments = comments;
-            }
-            if (Settings.IncludeExtendedPropertyComments == CommentsStyle.InSummaryBlock &&
-                !string.IsNullOrEmpty(ExtendedProperty))
-            {
-                if (string.IsNullOrEmpty(SummaryComments))
-                    SummaryComments = ExtendedProperty;
-                else
-                    SummaryComments += ". " + ExtendedProperty;
-            }
-
-            if (Settings.IncludeExtendedPropertyComments == CommentsStyle.AtEndOfField && !string.IsNullOrEmpty(ExtendedProperty))
-            {
-                if (string.IsNullOrEmpty(inlineComments))
-                    inlineComments = " // " + ExtendedProperty;
-                else
-                    inlineComments += ". " + ExtendedProperty;
-            }
-
-            var initialization = Settings.UsePropertyInitializers
-                ? (string.IsNullOrWhiteSpace(Default) ? string.Empty : string.Format(" = {0};", Default))
-                : string.Empty;
-
-            Entity = string.Format("public {0}{1} {2} {{ get; {3}set; }}{4}{5}", (OverrideModifier ? "override " : string.Empty),
-                WrapIfNullable(PropertyType), NameHumanCase,
-                Settings.UsePrivateSetterForComputedColumns && IsComputed() ? "private " : string.Empty, initialization,
-                inlineComments);
-        }
-
-        private string WrapIfNullable(string propType)
-        {
-            if (!IsColumnNullable())
-                return propType;
-
-            return string.Format(Settings.NullableShortHand ? "{0}?" : "System.Nullable<{0}>", propType);
-        }
-
         public bool IsColumnNullable()
         {
             return IsNullable && !NotNullable.Contains(PropertyType.ToLower());
         }
 
-        private bool IsComputed()
+        public bool IsComputed()
         {
             return IsStoreGenerated && !IsIdentity;
-        }
-
-        private void SetupConfig()
-        {
-            DataAnnotations = new List<string>();
-            string databaseGeneratedOption = null;
-            var schemaReference = Settings.UseDataAnnotations ? string.Empty : "System.ComponentModel.DataAnnotations.Schema.";
-
-            bool isNewSequentialId = !string.IsNullOrEmpty(Default) && Default.ToLower().Contains("newsequentialid");
-
-            if (IsIdentity || isNewSequentialId)
-            {
-                if (Settings.UseDataAnnotations || isNewSequentialId)
-                    DataAnnotations.Add("DatabaseGenerated(DatabaseGeneratedOption.Identity)");
-                else
-                    databaseGeneratedOption = string.Format(".HasDatabaseGeneratedOption({0}DatabaseGeneratedOption.Identity)", schemaReference);
-            }
-            else if (IsComputed())
-            {
-                if (Settings.UseDataAnnotations)
-                    DataAnnotations.Add("DatabaseGenerated(DatabaseGeneratedOption.Computed)");
-                else
-                    databaseGeneratedOption = string.Format(".HasDatabaseGeneratedOption({0}DatabaseGeneratedOption.Computed)", schemaReference);
-            }
-            else if (IsPrimaryKey)
-            {
-                if (Settings.UseDataAnnotations)
-                    DataAnnotations.Add("DatabaseGenerated(DatabaseGeneratedOption.None)");
-                else
-                    databaseGeneratedOption = string.Format(".HasDatabaseGeneratedOption({0}DatabaseGeneratedOption.None)", schemaReference);
-            }
-
-            var sb = new StringBuilder();
-
-            if (Settings.UseDataAnnotations)
-                DataAnnotations.Add(string.Format("Column(@\"{0}\", Order = {1}, TypeName = \"{2}\")", Name, Ordinal, SqlPropertyType));
-            else
-                sb.AppendFormat(".HasColumnName(@\"{0}\").HasColumnType(\"{1}\")", Name, SqlPropertyType);
-
-            if (Settings.UseDataAnnotations && Indexes.Any())
-            {
-                foreach (var index in Indexes)
-                {
-                    DataAnnotations.Add(string.Format("Index(@\"{0}\", {1}, IsUnique = {2}, IsClustered = {3})",
-                        index.IndexName,
-                        index.KeyOrdinal,
-                        index.IsUnique ? "true" : "false",
-                        index.IsClustered ? "true" : "false"));
-                }
-            }
-
-            if (IsNullable)
-            {
-                sb.Append(".IsOptional()");
-            }
-            else
-            {
-                if (Settings.UseDataAnnotations)
-                {
-                    if (!IsComputed())
-                        DataAnnotations.Add("Required");
-                }
-                else
-                    sb.Append(".IsRequired()");
-            }
-
-            if (IsFixedLength || IsRowVersion)
-            {
-                sb.Append(".IsFixedLength()");
-                // DataAnnotations.Add("????");
-            }
-
-            if (!IsUnicode)
-            {
-                sb.Append(".IsUnicode(false)");
-                // DataAnnotations.Add("????");
-            }
-
-            if (!IsMaxLength && MaxLength > 0)
-            {
-                var doNotSpecifySize = (Settings.IsSqlCe && MaxLength > 4000); // Issue #179
-
-                if (Settings.UseDataAnnotations)
-                {
-                    DataAnnotations.Add(doNotSpecifySize ? "MaxLength" : string.Format("MaxLength({0})", MaxLength));
-
-                    if (PropertyType.Equals("string", StringComparison.InvariantCultureIgnoreCase))
-                        DataAnnotations.Add(string.Format("StringLength({0})", MaxLength));
-                }
-                else
-                {
-                    if (doNotSpecifySize)
-                        sb.Append(".HasMaxLength(null)");
-                    else
-                        sb.AppendFormat(".HasMaxLength({0})", MaxLength);
-                }
-            }
-
-            if (IsMaxLength)
-            {
-                if (Settings.UseDataAnnotations)
-                    DataAnnotations.Add("MaxLength");
-                else
-                    sb.Append(".IsMaxLength()");
-            }
-
-            if ((Precision > 0 || Scale > 0) && PropertyType == "decimal")
-            {
-                sb.AppendFormat(".HasPrecision({0},{1})", Precision, Scale);
-                // DataAnnotations.Add("????");
-            }
-
-            if (IsRowVersion)
-            {
-                if (Settings.UseDataAnnotations)
-                    DataAnnotations.Add("Timestamp");
-                else
-                    sb.Append(".IsRowVersion()");
-            }
-
-            if (IsConcurrencyToken)
-            {
-                sb.Append(".IsConcurrencyToken()");
-                // DataAnnotations.Add("????");
-            }
-
-            if (databaseGeneratedOption != null)
-                sb.Append(databaseGeneratedOption);
-
-            var config = sb.ToString();
-            if (!string.IsNullOrEmpty(config))
-                Config = string.Format("Property(x => x.{0}){1};", NameHumanCase, config);
-
-            if (!Settings.UseDataAnnotations)
-                return; // Only data annotations below this point
-
-            if (IsPrimaryKey)
-                DataAnnotations.Add("Key");
-
-            string value;
-            if (Settings.ColumnNameToDataAnnotation.TryGetValue(NameHumanCase.ToLowerInvariant(), out value))
-                DataAnnotations.Add(value);
-
-            DataAnnotations.Add(string.Format("Display(Name = \"{0}\")", DisplayName));
-        }
-
-        public void SetupEntityAndConfig()
-        {
-            SetupEntity();
-            SetupConfig();
         }
 
         public void CleanUpDefault()
@@ -483,6 +272,14 @@ namespace Generator
                         Default = string.Format("System.Guid.Parse(\"{0}\")", Default);
                     break;
             }
+        }
+
+        public string WrapIfNullable()
+        {
+            if (!IsColumnNullable())
+                return PropertyType;
+
+            return string.Format(Settings.NullableShortHand ? "{0}?" : "System.Nullable<{0}>", PropertyType);
         }
     }
 }

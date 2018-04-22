@@ -63,7 +63,11 @@
     <Compile Include="EnumDefinition.cs" />
     <Compile Include="ForeignKey.cs" />
     <Compile Include="GeneratedTextTransformation.cs" />
-    <Compile Include="Generator.cs" />
+    <Compile Include="Generators\Generator.cs" />
+    <Compile Include="Generators\GeneratorEf6.cs" />
+    <Compile Include="Generators\GeneratorEfCore.cs" />
+    <Compile Include="Generators\GeneratorFactory.cs" />
+    <Compile Include="GeneratorType.cs" />
     <Compile Include="Index.cs" />
     <Compile Include="Inflector.cs" />
     <Compile Include="Pluralization\BidirectionalDictionary.cs" />
@@ -81,6 +85,7 @@
     <Compile Include="PropertyAndComments.cs" />
     <Compile Include="Relationship.cs" />
     <Compile Include="SchemaReaders\SchemaReader.cs" />
+    <Compile Include="SchemaReaders\SchemaReaderFactory.cs" />
     <Compile Include="Settings.cs" />
     <Compile Include="SchemaReaders\SqlServerCeSchemaReader.cs" />
     <Compile Include="SchemaReaders\SqlServerSchemaReader.cs" />

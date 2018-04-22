@@ -21,11 +21,11 @@ namespace Generator
             }
         }
 
-        public void IdentifyMappingTables(List<ForeignKey> fkList, bool checkForFkNameClashes)
+        public void IdentifyMappingTables(List<ForeignKey> fkList, bool checkForFkNameClashes, bool includeSchema)
         {
             foreach (var tbl in this.Where(x => x.HasForeignKey))
             {
-                tbl.IdentifyMappingTable(fkList, this, checkForFkNameClashes);
+                tbl.IdentifyMappingTable(fkList, this, checkForFkNameClashes, includeSchema);
             }
         }
 

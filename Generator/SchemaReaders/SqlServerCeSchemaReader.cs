@@ -375,8 +375,9 @@ WHERE   TABLE_NAME = '__ExtendedProperties'";
 
         public override void Init()
         {
-            Settings.IsSqlCe = true;
             Settings.PrependSchemaName = false;
+            IncludeSchema = false;
+            DoNotSpecifySizeForMaxLength = true;
         }
     }
 }

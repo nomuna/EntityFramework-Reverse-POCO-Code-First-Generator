@@ -91,7 +91,6 @@ namespace Generator.SchemaReaders
 
         public override void Init()
         {
-            throw new System.NotImplementedException();
         }
     }
 }

@@ -311,18 +311,7 @@ namespace Generator
             }
         }
 
-        public void AddMappingConfiguration(ForeignKey left, ForeignKey right, string leftPropName, string rightPropName)
-        {
-            MappingConfiguration.Add(string.Format(@"HasMany(t => t.{0}).WithMany(t => t.{1}).Map(m =>
-                {{
-                    m.ToTable(""{2}""{5});
-                    m.MapLeftKey(""{3}"");
-                    m.MapRightKey(""{4}"");
-                }});", leftPropName, rightPropName, left.FkTableName, left.FkColumn, right.FkColumn,
-                Settings.IsSqlCe ? string.Empty : ", \"" + left.FkSchema + "\""));
-        }
-
-        public void IdentifyMappingTable(List<ForeignKey> fkList, Tables tables, bool checkForFkNameClashes)
+        public void IdentifyMappingTable(List<ForeignKey> fkList, Tables tables, bool checkForFkNameClashes, bool includeSchema)
         {
             IsMapping = false;
 
@@ -369,24 +358,32 @@ namespace Generator
             var rightPropName = rightTable.GetUniqueColumnName(leftTable.NameHumanCase, left, checkForFkNameClashes, false,
                 Relationship.ManyToOne); // relationship from the mapping table to each side is Many-to-One
 
-            leftTable.AddMappingConfiguration(left, right, leftPropName, rightPropName);
+            leftTable.AddMappingConfiguration(left, right, leftPropName, rightPropName, includeSchema);
 
             IsMapping = true;
             rightTable.AddReverseNavigation(Relationship.ManyToMany, rightTable.NameHumanCase, leftTable, rightPropName, null, null, this);
             leftTable.AddReverseNavigation(Relationship.ManyToMany, leftTable.NameHumanCase, rightTable, leftPropName, null, null, this);
         }
 
-        public void SetupDataAnnotations()
+        private void AddMappingConfiguration(ForeignKey left, ForeignKey right, string leftPropName, string rightPropName, bool includeSchema)
         {
-            var schema = string.Empty;
-            if (!Settings.IsSqlCe)
-                schema = string.Format(", Schema = \"{0}\"", Schema);
+            MappingConfiguration.Add(string.Format(@"HasMany(t => t.{0}).WithMany(t => t.{1}).Map(m =>
+                {{
+                    m.ToTable(""{2}""{5});
+                    m.MapLeftKey(""{3}"");
+                    m.MapRightKey(""{4}"");
+                }});", leftPropName, rightPropName, left.FkTableName, left.FkColumn, right.FkColumn,
+                !includeSchema ? string.Empty : ", \"" + left.FkSchema + "\""));
+        }
+
+        public void SetupDataAnnotations(bool includeSchema)
+        {
+            var schema = includeSchema ? string.Format(", Schema = \"{0}\"", Schema) : string.Empty;
 
             DataAnnotations = new List<string>
             {
                 HasPrimaryKey ? string.Format("Table(\"{0}\"{1})", Name, schema) : "NotMapped"
             };
-
         }
     }
 }

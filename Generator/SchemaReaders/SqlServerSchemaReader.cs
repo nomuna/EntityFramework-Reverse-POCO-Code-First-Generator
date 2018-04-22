@@ -820,6 +820,7 @@ SELECT  SERVERPROPERTY('Edition') AS Edition,
                         _sqlDatabaseEdition = rdr["Edition"].ToString();
                         _sqlDatabaseEngineEdition = rdr["EngineEdition"].ToString();
 
+                        //todo move this
                         if (Settings.IncludeConnectionSettingComments)
                         {
                             WriteLine("// Database Edition       : " + _sqlDatabaseEdition);
@@ -1042,7 +1043,6 @@ SELECT  SERVERPROPERTY('Edition') AS Edition,
 
         public override void Init()
         {
-            throw new System.NotImplementedException();
         }
     }
 }

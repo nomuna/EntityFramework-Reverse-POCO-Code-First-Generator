@@ -40,8 +40,10 @@ namespace Generator.SchemaReaders
 
         private readonly DbProviderFactory _factory;
         private readonly GeneratedTextTransformation _generatedTextTransformation;
+        public bool IncludeSchema { get; protected set; }
+        public bool DoNotSpecifySizeForMaxLength { get; protected set; }
 
-        private static readonly Regex ColumnNameCleanup = new Regex("^(event|Equals|GetHashCode|GetType|ToString|repo|Save|IsNew|Insert|Update|Delete|Exists|SingleOrDefault|Single|First|FirstOrDefault|Fetch|Page|Query)$", RegexOptions.Compiled);
+        private static readonly Regex ReservedColumnNames = new Regex("^(event|Equals|GetHashCode|GetType|ToString|repo|Save|IsNew|Insert|Update|Delete|Exists|SingleOrDefault|Single|First|FirstOrDefault|Fetch|Page|Query)$", RegexOptions.Compiled);
 
         public static readonly List<string> ReservedKeywords = new List<string>
         {
@@ -62,6 +64,8 @@ namespace Generator.SchemaReaders
         {
             _factory = factory;
             _generatedTextTransformation = generatedTextTransformation;
+            IncludeSchema = true;
+            DoNotSpecifySizeForMaxLength = false;
         }
 
         protected DbCommand GetCmd(DbConnection connection)
@@ -187,15 +191,6 @@ namespace Generator.SchemaReaders
                 ReadIndexes(conn, result);
 
                 conn.Close();
-            }
-
-            //todo move this to the writer class
-            foreach (var tbl in result)
-            {
-                tbl.SetPrimaryKeys();
-                foreach (var c in tbl.Columns)
-                    Settings.UpdateColumn(c, tbl);
-                tbl.Columns.ForEach(x => x.SetupEntityAndConfig());
             }
 
             return result;
@@ -618,281 +613,6 @@ namespace Generator.SchemaReaders
             }
         }
 
-        public void ProcessForeignKeys(List<ForeignKey> fkList, Tables tables, bool checkForFkNameClashes)
-        {
-            var constraints = fkList.Select(x => x.FkSchema + "." + x.ConstraintName).Distinct();
-            foreach (var constraint in constraints)
-            {
-                var foreignKeys = fkList
-                    .Where(x => string.Format("{0}.{1}", x.FkSchema, x.ConstraintName)
-                        .Equals(constraint, StringComparison.InvariantCultureIgnoreCase))
-                    .ToList();
-
-                var foreignKey = foreignKeys.First();
-                var fkTable = tables.GetTable(foreignKey.FkTableName, foreignKey.FkSchema);
-                if (fkTable == null || fkTable.IsMapping || !fkTable.HasForeignKey)
-                    continue;
-
-                var pkTable = tables.GetTable(foreignKey.PkTableName, foreignKey.PkSchema);
-                if (pkTable == null || pkTable.IsMapping)
-                    continue;
-
-                var fkCols = foreignKeys.Select(x => new
-                    {
-                        fk = x,
-                        col = fkTable.Columns.Find(n =>
-                            string.Equals(n.Name, x.FkColumn, StringComparison.InvariantCultureIgnoreCase))
-                    })
-                    .Where(x => x.col != null)
-                    .OrderBy(o => o.fk.Ordinal)
-                    .ToList();
-
-                if (!fkCols.Any())
-                    continue;
-
-                //if(EF6)
-                {
-                    // Check FK has same number of columns as the primary key it points to
-                    var pks = pkTable.PrimaryKeys.OrderBy(x => x.PropertyType).ThenBy(y => y.Name).ToArray();
-                    var cols = fkCols.Select(x => x.col).OrderBy(x => x.PropertyType).ThenBy(y => y.Name).ToArray();
-                    if (pks.Length != cols.Length)
-                        continue;
-
-                    // EF6 - Cannot have a FK to a non-primary key
-                    if (pks.Where((pk, ef6Check) => pk.PropertyType != cols[ef6Check].PropertyType).Any())
-                        continue;
-                }
-
-                var pkCols = foreignKeys.Select(x => pkTable.Columns.Find(n => string.Equals(n.Name, x.PkColumn, StringComparison.InvariantCultureIgnoreCase)))
-                    .Where(x => x != null)
-                    .OrderBy(o => o.Ordinal)
-                    .ToList();
-
-                if (!pkCols.Any())
-                    continue;
-
-                var relationship = CalcRelationship(pkTable, fkTable, fkCols.Select(c => c.col).ToList(), pkCols);
-                if (relationship == Relationship.DoNotUse)
-                    continue;
-
-                if (fkCols.All(x => !x.col.IsNullable && !x.col.Hidden) && pkCols.All(x => x.IsPrimaryKey || x.IsUnique))
-                {
-                    foreach (var fk in fkCols)
-                        fk.fk.IncludeRequiredAttribute = true;
-                }
-
-                var fkCol = fkCols.First();
-                var pkCol = pkCols.First();
-
-                foreignKey = Settings.ForeignKeyProcessing(foreignKeys, fkTable, pkTable, fkCols.Any(x => x.col.IsNullable));
-
-                var pkTableHumanCaseWithSuffix = foreignKey.PkTableHumanCase(pkTable.Suffix);
-                var pkTableHumanCase = foreignKey.PkTableHumanCase(null);
-                var pkPropName = fkTable.GetUniqueColumnName(pkTableHumanCase, foreignKey, checkForFkNameClashes, true, Relationship.ManyToOne);
-                var fkMakePropNameSingular = (relationship == Relationship.OneToOne);
-                var fkPropName = pkTable.GetUniqueColumnName(fkTable.NameHumanCase, foreignKey, checkForFkNameClashes, fkMakePropNameSingular, Relationship.OneToMany);
-
-                var dataAnnotation = string.Empty;
-                if (Settings.UseDataAnnotations)
-                {
-                    dataAnnotation = string.Format("[ForeignKey(\"{0}\"){1}] ",
-                        string.Join(", ", fkCols.Select(x => x.col.NameHumanCase).Distinct().ToArray()),
-                        foreignKey.IncludeRequiredAttribute ? ", Required" : string.Empty
-                    );
-
-                    if (!checkForFkNameClashes &&
-                        relationship == Relationship.OneToOne &&
-                        foreignKey.IncludeReverseNavigation &&
-                        fkCols.All(x => x.col.IsPrimaryKey))
-                    {
-                        var principalEndAttribute = string.Format("ForeignKey(\"{0}\")", pkPropName);
-                        foreach (var fk in fkCols)
-                        {
-                            if (!fk.col.DataAnnotations.Contains(principalEndAttribute))
-                                fk.col.DataAnnotations.Add(principalEndAttribute);
-                        }
-                    }
-                }
-
-                var fkd = new PropertyAndComments
-                {
-                    AdditionalDataAnnotations = Settings.ForeignKeyAnnotationsProcessing(fkTable, pkTable, pkPropName),
-
-                    Definition = string.Format("{0}public {1}{2} {3} {4}{5}", dataAnnotation,
-                        Table.GetLazyLoadingMarker(),
-                        pkTableHumanCaseWithSuffix,
-                        pkPropName,
-                        "{ get; set; }",
-                        Settings.IncludeComments != CommentsStyle.None ? " // " + foreignKey.ConstraintName : string.Empty),
-
-                    Comments = string.Format("Parent {0} pointed by [{1}].({2}) ({3})",
-                        pkTableHumanCase,
-                        fkTable.Name,
-                        string.Join(", ", fkCols.Select(x => "[" + x.col.NameHumanCase + "]").Distinct().ToArray()),
-                        foreignKey.ConstraintName)
-                };
-                fkCol.col.EntityFk.Add(fkd);
-
-                string manyToManyMapping, mapKey;
-                if (foreignKeys.Count > 1)
-                {
-                    manyToManyMapping = string.Format("c => new {{ {0} }}",
-                        string.Join(", ", fkCols.Select(x => "c." + x.col.NameHumanCase).Distinct().ToArray()));
-
-                    mapKey = string.Format("{0}",
-                        string.Join(",", fkCols.Select(x => "\"" + x.col.Name + "\"").Distinct().ToArray()));
-                }
-                else
-                {
-                    manyToManyMapping = string.Format("c => c.{0}", fkCol.col.NameHumanCase);
-                    mapKey = string.Format("\"{0}\"", fkCol.col.Name);
-                }
-
-                if (!Settings.UseDataAnnotations)
-                {
-                    fkCol.col.ConfigFk.Add(string.Format("{0};{1}",
-                        GetRelationship(relationship, fkCol.col, pkCol, pkPropName, fkPropName, manyToManyMapping, mapKey,
-                            foreignKey.CascadeOnDelete, foreignKey.IncludeReverseNavigation, foreignKey.IsNotEnforced),
-                        Settings.IncludeComments != CommentsStyle.None
-                            ? " // " + foreignKey.ConstraintName
-                            : string.Empty));
-                }
-
-                if (foreignKey.IncludeReverseNavigation)
-                    pkTable.AddReverseNavigation(relationship, pkTableHumanCase, fkTable, fkPropName,
-                        string.Format("{0}.{1}", fkTable.Name, foreignKey.ConstraintName), foreignKeys);
-            }
-        }
-
-        public void IdentifyForeignKeys(List<ForeignKey> fkList, Tables tables)
-        {
-            foreach (var foreignKey in fkList)
-            {
-                var fkTable = tables.GetTable(foreignKey.FkTableName, foreignKey.FkSchema);
-                if (fkTable == null)
-                    continue; // Could be filtered out
-
-                var pkTable = tables.GetTable(foreignKey.PkTableName, foreignKey.PkSchema);
-                if (pkTable == null)
-                    continue; // Could be filtered out
-
-                var fkCol = fkTable.Columns.Find(n => string.Equals(n.Name, foreignKey.FkColumn, StringComparison.InvariantCultureIgnoreCase));
-                if (fkCol == null)
-                    continue; // Could not find fk column
-
-                var pkCol = pkTable.Columns.Find(n => string.Equals(n.Name, foreignKey.PkColumn, StringComparison.InvariantCultureIgnoreCase));
-                if (pkCol == null)
-                    continue; // Could not find pk column
-
-                fkTable.HasForeignKey = true;
-            }
-        }
-
-        private static string GetRelationship(Relationship relationship, Column fkCol, Column pkCol, string pkPropName,
-            string fkPropName, string manyToManyMapping, string mapKey, bool cascadeOnDelete, bool includeReverseNavigation,
-            bool isNotEnforced)
-        {
-            return string.Format("Has{0}(a => a.{1}){2}{3}",
-                GetHasMethod(relationship, fkCol, pkCol, isNotEnforced),
-                pkPropName,
-                GetWithMethod(relationship, fkCol, fkPropName, manyToManyMapping, mapKey, includeReverseNavigation),
-                cascadeOnDelete ? string.Empty : ".WillCascadeOnDelete(false)");
-        }
-
-        // HasOptional
-        // HasRequired
-        // HasMany
-        private static string GetHasMethod(Relationship relationship, Column fkCol, Column pkCol, bool isNotEnforced)
-        {
-            bool withMany = false;
-            switch (relationship)
-            {
-                case Relationship.ManyToOne:
-                case Relationship.ManyToMany:
-                    withMany = true;
-                    break;
-            }
-
-            if (withMany || pkCol.IsPrimaryKey || pkCol.IsUniqueConstraint || pkCol.IsUnique)
-                return fkCol.IsNullable || isNotEnforced ? "Optional" : "Required";
-
-            return "Many";
-        }
-
-        // WithOptional
-        // WithRequired
-        // WithMany
-        // WithRequiredPrincipal
-        // WithRequiredDependent
-        private static string GetWithMethod(Relationship relationship, Column fkCol, string fkPropName,
-            string manyToManyMapping, string mapKey, bool includeReverseNavigation)
-        {
-            var withParam = includeReverseNavigation ? string.Format("b => b.{0}", fkPropName) : string.Empty;
-
-            switch (relationship)
-            {
-                case Relationship.OneToOne:
-                    return string.Format(".WithOptional({0})", withParam);
-
-                case Relationship.OneToMany:
-                    return string.Format(".WithRequiredDependent({0})", withParam);
-
-                case Relationship.ManyToOne:
-                    if (!fkCol.Hidden)
-                        return string.Format(".WithMany({0}).HasForeignKey({1})", withParam, manyToManyMapping); // Foreign Key Association
-                    return string.Format(".WithMany({0}).Map(c => c.MapKey({1}))", withParam, mapKey); // Independent Association
-
-                case Relationship.ManyToMany:
-                    return string.Format(".WithMany({0}).HasForeignKey({1})", withParam, manyToManyMapping);
-
-                default:
-                    throw new ArgumentOutOfRangeException("relationship");
-            }
-        }
-
-        // Calculates the relationship between a child table and it's parent table.
-        private static Relationship CalcRelationship(Table parentTable, Table childTable, List<Column> childTableCols, List<Column> parentTableCols)
-        {
-            if (childTableCols.Count == 1 && parentTableCols.Count == 1)
-                return CalcRelationshipSingle(parentTable, childTable, childTableCols.First(), parentTableCols.First());
-
-            // This relationship has multiple composite keys
-
-            // childTable FK columns are exactly the primary key (they are part of primary key, and no other columns are primary keys) //TODO: we could also check if they are an unique index
-            var childTableColumnsAllPrimaryKeys =
-                (childTableCols.Count == childTableCols.Count(x => x.IsPrimaryKey)) &&
-                (childTableCols.Count == childTable.PrimaryKeys.Count());
-
-            // parentTable columns are exactly the primary key (they are part of primary key, and no other columns are primary keys) //TODO: we could also check if they are an unique index
-            var parentTableColumnsAllPrimaryKeys =
-                (parentTableCols.Count == parentTableCols.Count(x => x.IsPrimaryKey)) &&
-                (parentTableCols.Count == parentTable.PrimaryKeys.Count());
-
-            // childTable FK columns are not only FK but also the whole PK (not only part of PK); parentTable columns are the whole PK (not only part of PK) - so it's 1:1
-            if (childTableColumnsAllPrimaryKeys && parentTableColumnsAllPrimaryKeys)
-                return Relationship.OneToOne;
-
-            return Relationship.ManyToOne;
-        }
-
-        // Calculates the relationship between a child table and it's parent table.
-        private static Relationship CalcRelationshipSingle(Table parentTable, Table childTable, Column childTableCol, Column parentTableCol)
-        {
-            if (!childTableCol.IsPrimaryKey && !childTableCol.IsUniqueConstraint)
-                return Relationship.ManyToOne;
-
-            if (!parentTableCol.IsPrimaryKey && !parentTableCol.IsUniqueConstraint)
-                return Relationship.ManyToOne;
-
-            if (childTable.PrimaryKeys.Count() != 1)
-                return Relationship.ManyToOne;
-
-            if (parentTable.PrimaryKeys.Count() != 1)
-                return Relationship.ManyToOne;
-
-            return Relationship.OneToOne;
-        }
-
         private Column CreateColumn(IDataRecord rdr, Table table)
         {
             if (rdr == null)
@@ -951,7 +671,7 @@ namespace Generator.SchemaReaders
 
             col.CleanUpDefault();
             col.NameHumanCase = CleanUp(col.Name);
-            col.NameHumanCase = ColumnNameCleanup.Replace(col.NameHumanCase, "_$1");
+            col.NameHumanCase = ReservedColumnNames.Replace(col.NameHumanCase, "_$1");
 
             if (ReservedKeywords.Contains(col.NameHumanCase))
                 col.NameHumanCase = "@" + col.NameHumanCase;

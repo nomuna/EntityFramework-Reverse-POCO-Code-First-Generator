@@ -20,7 +20,7 @@ namespace Generator.Writer
             _codeGeneratedAttribute = string.Format("[System.CodeDom.Compiler.GeneratedCode(\"EF.Reverse.POCO.Generator\", \"{0}\")]", _version);
         }
 
-        public void something()
+        public void WriteConnectionSettingComments()
         {
 
         }

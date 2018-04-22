@@ -10,6 +10,7 @@ namespace Generator
     {
         // Main settings **********************************************************************************************************************
         public static DatabaseType DatabaseType = DatabaseType.SqlServer; // SqlCe. Comming soon: Oracle, MySql, PostgreSQL
+        public static GeneratorType GeneratorType = GeneratorType.Ef6; // GeneratorType.EfCore;
         public static string ConnectionStringName = "MyDbContext";   // Searches for this connection string in config files listed below in the ConfigFilenameSearchOrder setting
         // ConnectionStringName is the only required setting.
         public static int CommandTimeout = 600; // SQL Command timeout in seconds. 600 is 10 minutes, 0 will wait indefinately. Some databases can be slow retrieving schema information.
@@ -36,8 +37,6 @@ namespace Generator
             get { return _defaultConstructorArgument ?? string.Format('"' + "Name={0}" + '"', ConnectionStringName); }
             set { _defaultConstructorArgument = value; }
         }
-
-        public static bool IsSqlCe { get; set; } // todo delete
 
         public static string ConfigurationClassName = "Configuration"; // Configuration, Mapping, Map, etc. This is appended to the Poco class name to configure the mappings.
         public static string[] FilenameSearchOrder = new[] { "app.config", "web.config" }; // Add more here if required. The config files are searched for in the local project first, then the whole solution second.
