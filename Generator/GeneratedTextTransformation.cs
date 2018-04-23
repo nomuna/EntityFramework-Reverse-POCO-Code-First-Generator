@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Globalization;
+using System.Text;
 using System.Text.RegularExpressions;
 using Generator.Generators;
 using Generator.Writer;
@@ -11,18 +12,19 @@ namespace Generator
     {
         private Generators.Generator _generator;
         private Writer.Writer _writer;
+        private StringBuilder _fileData;
 
-        public Writer.Writer Writer
+        public string Run()
         {
-            get { return _writer; }
-        }
-        public Generators.Generator Generator
-        {
-            get { return _generator; }
+            Init();
+            ReadSchema();
+            _writer.Write();
+            return _fileData.ToString();
         }
 
-        public void Init()
+        private void Init()
         {
+            _fileData = new StringBuilder();
             _generator = GeneratorFactory.Create(this);
             _writer = WriterFactory.Create(this);
 
@@ -73,7 +75,7 @@ namespace Generator
             }
         }
 
-        public void ReadSchema()
+        private void ReadSchema()
         {
             try
             {
@@ -116,7 +118,10 @@ namespace Generator
 
         private void LogToOutput(string message)
         {
-            Trace.WriteLine(message);
+            if(Settings.WriteOutputToTraceWindow)
+                Trace.WriteLine(message);
+
+            _fileData.AppendLine(message);
         }
     }
 }

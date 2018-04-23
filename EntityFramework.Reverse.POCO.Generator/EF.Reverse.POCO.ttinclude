@@ -37,7 +37,7 @@ usingsAll.AddRange(Settings.AdditionalNamespaces.Where(x => !string.IsNullOrEmpt
 
 if ((Settings.ElementsToGenerate.HasFlag(Elements.PocoConfiguration) ||
      Settings.ElementsToGenerate.HasFlag(Elements.Context) ||
-     Settings.ElementsToGenerate.HasFlag(Elements.UnitOfWork)) &&
+     Settings.ElementsToGenerate.HasFlag(Elements.Interface)) &&
     (!Settings.ElementsToGenerate.HasFlag(Elements.Poco) && !string.IsNullOrWhiteSpace(Settings.PocoNamespace)))
     usingsAll.Add(Settings.PocoNamespace);
 
@@ -46,8 +46,8 @@ if (Settings.ElementsToGenerate.HasFlag(Elements.PocoConfiguration) &&
     usingsAll.Add(Settings.ContextNamespace);
 
 if (Settings.ElementsToGenerate.HasFlag(Elements.Context) &&
-    (!Settings.ElementsToGenerate.HasFlag(Elements.UnitOfWork) && !string.IsNullOrWhiteSpace(Settings.UnitOfWorkNamespace)))
-    usingsAll.Add(Settings.UnitOfWorkNamespace);
+    (!Settings.ElementsToGenerate.HasFlag(Elements.Interface) && !string.IsNullOrWhiteSpace(Settings.InterfaceNamespace)))
+    usingsAll.Add(Settings.InterfaceNamespace);
 
 if (Settings.ElementsToGenerate.HasFlag(Elements.Context) &&
     (!Settings.ElementsToGenerate.HasFlag(Elements.PocoConfiguration) && !string.IsNullOrWhiteSpace(Settings.PocoConfigurationNamespace)))
@@ -68,7 +68,7 @@ foreach(var usingStatement in usingsAll.Distinct().OrderBy(x => x)) { #>
     using <#= usingStatement #>;
 <# } #>
 
-<# if (Settings.ElementsToGenerate.HasFlag(Elements.UnitOfWork) && !string.IsNullOrWhiteSpace(Settings.DbContextInterfaceName))
+<# if (Settings.ElementsToGenerate.HasFlag(Elements.Interface) && !string.IsNullOrWhiteSpace(Settings.DbContextInterfaceName))
 {
     fileManager.StartNewFile(Settings.DbContextInterfaceName + Settings.FileExtension);
     if (!Settings.GenerateSeparateFiles)
@@ -193,7 +193,7 @@ if (Settings.IncludeTableValuedFunctions)
     }
 
 <# }
-if(Settings.ElementsToGenerate.HasFlag(Elements.UnitOfWork) && !string.IsNullOrWhiteSpace(Settings.DbContextInterfaceName) && !Settings.GenerateSeparateFiles) { #>
+if(Settings.ElementsToGenerate.HasFlag(Elements.Interface) && !string.IsNullOrWhiteSpace(Settings.DbContextInterfaceName) && !Settings.GenerateSeparateFiles) { #>
     #endregion
 
 <# }

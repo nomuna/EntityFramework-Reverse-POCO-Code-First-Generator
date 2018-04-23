@@ -65,6 +65,7 @@ namespace Generator
         public static bool IncludeQueryTraceOn9481Flag = false; // If SqlServer 2014 appears frozen / take a long time when this file is saved, try setting this to true (you will also need elevated privileges).
         public static bool IncludeCodeGeneratedAttribute = true; // If true, will include the GeneratedCode attribute, false to remove it.
         public static bool UsePrivateSetterForComputedColumns = true; // If the columns is computed, use a private setter.
+        public static bool WriteOutputToTraceWindow = false; // If true, will also write the generated output to the Visual Studio debug window
         public static string[] AdditionalNamespaces = new[] { "" };  // To include extra namespaces, include them here. i.e. "Microsoft.AspNet.Identity.EntityFramework"
         public static string[] AdditionalContextInterfaceItems = new[] // To include extra db context interface items, include them here. Also set MakeClassesPartial=true, and implement the partial DbContext class functions.
         {
