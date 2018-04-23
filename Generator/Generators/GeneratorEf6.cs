@@ -141,7 +141,7 @@ namespace Generator.Generators
 
             if (!c.IsMaxLength && c.MaxLength > 0)
             {
-                var doNotSpecifySize = (_schemaReader.DoNotSpecifySizeForMaxLength && c.MaxLength > 4000); // Issue #179
+                var doNotSpecifySize = (DatabaseReader.DoNotSpecifySizeForMaxLength && c.MaxLength > 4000); // Issue #179
 
                 if (Settings.UseDataAnnotations)
                 {

@@ -77,18 +77,18 @@
     <Compile Include="Pluralization\IPluralizationService.cs" />
     <Compile Include="Pluralization\PluralizationServiceUtil.cs" />
     <Compile Include="Pluralization\StringBidirectionalDictionary.cs" />
-    <Compile Include="SchemaReaders\MySqlSchemaReader.cs" />
-    <Compile Include="SchemaReaders\OracleSchemaReader.cs" />
-    <Compile Include="SchemaReaders\PostgreSqlSchemaReader.cs" />
+    <Compile Include="DatabaseReaders\MySqlDatabaseReader.cs" />
+    <Compile Include="DatabaseReaders\OracleDatabaseReader.cs" />
+    <Compile Include="DatabaseReaders\PostgreSqlDatabaseReader.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="PropertyAndComments.cs" />
     <Compile Include="Relationship.cs" />
-    <Compile Include="SchemaReaders\SchemaReader.cs" />
-    <Compile Include="SchemaReaders\SchemaReaderFactory.cs" />
+    <Compile Include="DatabaseReaders\DatabaseReader.cs" />
+    <Compile Include="DatabaseReaders\DatabaseReaderFactory.cs" />
     <Compile Include="Settings.cs" />
-    <Compile Include="SchemaReaders\SqlServerCeSchemaReader.cs" />
-    <Compile Include="SchemaReaders\SqlServerSchemaReader.cs" />
+    <Compile Include="DatabaseReaders\SqlServerCeDatabaseReader.cs" />
+    <Compile Include="DatabaseReaders\SqlServerDatabaseReader.cs" />
     <Compile Include="StoredProcedure.cs" />
     <Compile Include="StoredProcedureCallbacks.cs" />
     <Compile Include="StoredProcedureParameter.cs" />
@@ -98,6 +98,7 @@
     <Compile Include="Writer\Writer.cs" />
     <Compile Include="Writer\WriterEf6.cs" />
     <Compile Include="Writer\WriterEfCore.cs" />
+    <Compile Include="Writer\WriterFactory.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config">

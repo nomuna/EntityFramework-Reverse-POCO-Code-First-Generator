@@ -1,10 +1,10 @@
 ﻿using System.Data.Common;
 
-namespace Generator.SchemaReaders
+namespace Generator.DatabaseReaders
 {
-    public class MySqlSchemaReader : SchemaReader
+    public class MySqlDatabaseReader : DatabaseReader
     {
-        public MySqlSchemaReader(DbProviderFactory factory, GeneratedTextTransformation outer)
+        public MySqlDatabaseReader(DbProviderFactory factory, GeneratedTextTransformation outer)
             : base(factory, outer)
         {
         }

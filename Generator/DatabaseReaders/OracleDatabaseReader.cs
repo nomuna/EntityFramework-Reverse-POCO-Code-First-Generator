@@ -1,10 +1,10 @@
 ﻿using System.Data.Common;
 
-namespace Generator.SchemaReaders
+namespace Generator.DatabaseReaders
 {
-    public class OracleSchemaReader : SchemaReader
+    public class OracleDatabaseReader : DatabaseReader
     {
-        public OracleSchemaReader(DbProviderFactory factory, GeneratedTextTransformation outer)
+        public OracleDatabaseReader(DbProviderFactory factory, GeneratedTextTransformation outer)
             : base(factory, outer)
         {
         }

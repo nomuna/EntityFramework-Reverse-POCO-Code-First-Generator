@@ -1,13 +1,13 @@
 ﻿using System.Data.Common;
 
-namespace Generator.SchemaReaders
+namespace Generator.DatabaseReaders
 {
     // Used for both SQL Server and SQL Azure
-    public class SqlServerSchemaReader : SchemaReader
+    public class SqlServerDatabaseReader : DatabaseReader
     {
         private string _sqlDatabaseEdition, _sqlDatabaseEngineEdition;
 
-        public SqlServerSchemaReader(DbProviderFactory factory, GeneratedTextTransformation outer)
+        public SqlServerDatabaseReader(DbProviderFactory factory, GeneratedTextTransformation outer)
             : base(factory, outer)
         {
             _sqlDatabaseEdition = null;

@@ -1,18 +1,18 @@
 ﻿using System;
 
-namespace Generator.Generators
+namespace Generator.Writer
 {
-    public static class GeneratorFactory
+    public static class WriterFactory
     {
-        public static Generator Create(GeneratedTextTransformation outer)
+        public static Writer Create(GeneratedTextTransformation outer)
         {
             switch (Settings.GeneratorType)
             {
                 case GeneratorType.Ef6:
-                    return new GeneratorEf6(outer);
+                    return new WriterEf6(outer);
 
                 case GeneratorType.EfCore:
-                    return new GeneratorEfCore(outer);
+                    return new WriterEfCore(outer);
 
                 default:
                     throw new ArgumentOutOfRangeException();

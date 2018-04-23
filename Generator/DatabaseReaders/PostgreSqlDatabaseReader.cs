@@ -1,10 +1,10 @@
 ﻿using System.Data.Common;
 
-namespace Generator.SchemaReaders
+namespace Generator.DatabaseReaders
 {
-    public class PostgreSqlSchemaReader : SchemaReader
+    public class PostgreSqlDatabaseReader : DatabaseReader
     {
-        public PostgreSqlSchemaReader(DbProviderFactory factory, GeneratedTextTransformation outer)
+        public PostgreSqlDatabaseReader(DbProviderFactory factory, GeneratedTextTransformation outer)
             : base(factory, outer)
         {
         }

@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Data.Common;
 using System.Data.SqlClient;
 using System.Linq;
-using Generator.SchemaReaders;
+using Generator.DatabaseReaders;
 
 namespace Generator.Generators
 {
@@ -14,7 +14,7 @@ namespace Generator.Generators
 
         private readonly GeneratedTextTransformation _outer;
         private DbProviderFactory _factory;
-        protected SchemaReader _schemaReader;
+        protected DatabaseReader DatabaseReader;
         public Tables Tables { get; private set; }
         public List<StoredProcedure> StoredProcs { get; private set; }
 
@@ -23,12 +23,12 @@ namespace Generator.Generators
         {
             _outer = outer;
             _factory = null;
-            _schemaReader = null;
+            DatabaseReader = null;
         }
 
         public void Init()
         {
-            _schemaReader = null;
+            DatabaseReader = null;
             _factory = DbProviderFactories.GetFactory(Settings.ProviderName);
             if (_factory == null)
             {
@@ -36,18 +36,18 @@ namespace Generator.Generators
                 return;
             }
 
-            _schemaReader = SchemaReaderFactory.CreateSchemaReader(_factory, _outer);
-            if (_schemaReader == null)
+            DatabaseReader = DatabaseReaderFactory.Create(_factory, _outer);
+            if (DatabaseReader == null)
                 _outer.WriteLine("Cannot create a schema reader due to unknown database type.");
             else
-                _schemaReader.Init();
+                DatabaseReader.Init();
         }
 
         public void LoadTables()
         {
             Tables = new Tables();
 
-            if (_factory == null || _schemaReader == null ||
+            if (_factory == null || DatabaseReader == null ||
                 !(Settings.ElementsToGenerate.HasFlag(Elements.Poco) ||
                   Settings.ElementsToGenerate.HasFlag(Elements.Context) ||
                   Settings.ElementsToGenerate.HasFlag(Elements.Interface) ||
@@ -56,7 +56,7 @@ namespace Generator.Generators
 
             try
             {
-                Tables = _schemaReader.ReadSchema();
+                Tables = DatabaseReader.ReadSchema();
                 foreach (var t in Tables)
                 {
                     t.SetPrimaryKeys();
@@ -67,18 +67,18 @@ namespace Generator.Generators
                     t.Columns.ForEach(c => SetupEntityAndConfig(c));
 
                     if (Settings.UseDataAnnotations)
-                        t.SetupDataAnnotations(_schemaReader.IncludeSchema);
+                        t.SetupDataAnnotations(DatabaseReader.IncludeSchema);
 
                     t.Suffix = Settings.TableSuffix;
                 }
 
-                var fkList = _schemaReader.ReadForeignKeys();
+                var fkList = DatabaseReader.ReadForeignKeys();
                 IdentifyForeignKeys(fkList);
 
                 // Work out if there are any foreign key relationship naming clashes
                 ProcessForeignKeys(fkList, Tables, true);
                 if (Settings.UseMappingTables)
-                    Tables.IdentifyMappingTables(fkList, true, _schemaReader.IncludeSchema);
+                    Tables.IdentifyMappingTables(fkList, true, DatabaseReader.IncludeSchema);
 
                 // Now we know our foreign key relationships and have worked out if there are any name clashes,
                 // re-map again with intelligently named relationships.
@@ -86,7 +86,7 @@ namespace Generator.Generators
 
                 ProcessForeignKeys(fkList, Tables, false);
                 if (Settings.UseMappingTables)
-                    Tables.IdentifyMappingTables(fkList, false, _schemaReader.IncludeSchema);
+                    Tables.IdentifyMappingTables(fkList, false, DatabaseReader.IncludeSchema);
             }
             catch (Exception x)
             {
@@ -109,17 +109,17 @@ namespace Generator.Generators
         {
             StoredProcs = new List<StoredProcedure>();
 
-            if (_factory == null || _schemaReader == null || !Settings.IncludeStoredProcedures || !_schemaReader.CanReadStoredProcedures())
+            if (_factory == null || DatabaseReader == null || !Settings.IncludeStoredProcedures || !DatabaseReader.CanReadStoredProcedures())
                 return;
 
             try
             {
-                var storedProcs = _schemaReader.ReadStoredProcs();
+                var storedProcs = DatabaseReader.ReadStoredProcs();
 
                 using (var sqlConnection = new SqlConnection(Settings.ConnectionString))
                 {
                     foreach (var proc in storedProcs)
-                        _schemaReader.ReadStoredProcReturnObject(sqlConnection, proc);
+                        DatabaseReader.ReadStoredProcReturnObject(sqlConnection, proc);
                 }
 
                 // Remove stored procs where the return model type contains spaces and cannot be mapped

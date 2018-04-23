@@ -1,10 +1,10 @@
 ﻿using System.Data.Common;
 
-namespace Generator.SchemaReaders
+namespace Generator.DatabaseReaders
 {
-    public class SqlServerCeSchemaReader : SchemaReader
+    public class SqlServerCeDatabaseReader : DatabaseReader
     {
-        public SqlServerCeSchemaReader(DbProviderFactory factory, GeneratedTextTransformation outer)
+        public SqlServerCeDatabaseReader(DbProviderFactory factory, GeneratedTextTransformation outer)
             : base(factory, outer)
         {
         }

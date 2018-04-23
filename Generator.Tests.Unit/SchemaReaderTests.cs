@@ -1,4 +1,4 @@
-﻿using Generator.SchemaReaders;
+﻿using Generator.DatabaseReaders;
 using NUnit.Framework;
 
 namespace Generator.Tests.Unit
@@ -29,7 +29,7 @@ namespace Generator.Tests.Unit
         public void Test(string test, string expected, bool useCamelCase)
         {
             // Act
-            var clean = SchemaReader.CleanUp(test);
+            var clean = DatabaseReader.CleanUp(test);
             var singular = clean;
             var nameHumanCase = (useCamelCase ? Inflector.ToTitleCase(singular) : singular).Replace(" ", "").Replace("$", "").Replace(".", "");
 
@@ -84,7 +84,7 @@ namespace Generator.Tests.Unit
         [TestCase("Some id", "Some ID")]
         public void DisplayName(string test, string expected)
         {
-            var displayName = SchemaReader.ToDisplayName(test);
+            var displayName = DatabaseReader.ToDisplayName(test);
 
             // Assert
             Assert.AreEqual(expected, displayName);

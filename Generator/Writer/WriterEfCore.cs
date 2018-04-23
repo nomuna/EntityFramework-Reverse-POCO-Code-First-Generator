@@ -6,5 +6,9 @@
             : base(outer)
         {
         }
+
+        public override void Init()
+        {
+        }
     }
 }

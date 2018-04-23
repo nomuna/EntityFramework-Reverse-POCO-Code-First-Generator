@@ -12,10 +12,12 @@ namespace Generator
             Settings.TargetFrameworkVersion = 4.5f;
             Settings.ConnectionString = "Data Source=(local);Initial Catalog=Northwind;Integrated Security=True;Application Name=Generator";
             Settings.ProviderName = "System.Data.SqlClient";
+            Settings.DatabaseType = DatabaseType.SqlServer;
 
             // Use this when testing SQL Server Compact 4.0
-            //private const string ProviderName = "System.Data.SqlServerCe.4.0";
-            //string ConnectionString = @"Data Source=|DataDirectory|\NorthwindSqlCe40.sdf";   // Uses last connection string in config if not specified
+            //Settings.ConnectionString = @"Data Source=|DataDirectory|\NorthwindSqlCe40.sdf";   // Uses last connection string in config if not specified
+            //Settings.ProviderName = "System.Data.SqlServerCe.4.0";
+            //Settings.DatabaseType = DatabaseType.SqlCe;
 
 
             //Inflector.PluralizationService = null;
@@ -27,7 +29,14 @@ namespace Generator
                 var x = new GeneratedTextTransformation();
                 x.Init();
                 x.ReadSchema();
-                foreach (var table in x.Generator.Tables.Where(t => !t.IsMapping))
+
+                // Generate output
+                //if (Settings.Tables.Count > 0 || Settings.StoredProcs.Count > 0)
+                //{
+
+                //}
+
+                /*foreach (var table in x.Generator.Tables.Where(t => !t.IsMapping))
                 {
                     Console.WriteLine(table.NameHumanCase);
                     sw.WriteLine(table.NameHumanCase);
@@ -36,12 +45,6 @@ namespace Generator
                     {
                         if (!string.IsNullOrWhiteSpace(col.Entity))
                             Console.WriteLine("  " + col.Entity);
-
-                        //if (!string.IsNullOrWhiteSpace(col.EntityFk))
-                        //{
-                        //    Console.WriteLine("  " + col.EntityFk);
-                        //    sw.WriteLine("  " + col.EntityFk);
-                        //}
                     }
                     if (table.Columns.Count > 0)
                         Console.WriteLine();
@@ -81,7 +84,7 @@ namespace Generator
                     }
                     Console.WriteLine();
                     sw.WriteLine();
-                }
+                }*/
             }
         }
     }

@@ -2,7 +2,7 @@
 using System.Data;
 using System.Linq;
 using System.Text;
-using Generator.SchemaReaders;
+using Generator.DatabaseReaders;
 
 namespace Generator
 {
@@ -196,7 +196,7 @@ namespace Generator
 
         public static readonly Func<DataColumn, string> WriteStoredProcReturnColumn = col =>
         {
-            var columnName = SchemaReader.ReservedKeywords.Contains(col.ColumnName) ? "@" + col.ColumnName : col.ColumnName;
+            var columnName = DatabaseReader.ReservedKeywords.Contains(col.ColumnName) ? "@" + col.ColumnName : col.ColumnName;
 
             return string.Format("public {0} {1} {{ get; set; }}",
                 StoredProcedure.WrapTypeIfNullable(

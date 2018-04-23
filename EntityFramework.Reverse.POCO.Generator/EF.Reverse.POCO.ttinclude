@@ -1,3 +1,4 @@
+<#@ template debug="true" hostspecific="true" language="C#" #>
 <#@ import namespace="System.Collections.Generic" #>
 <#
 fileManager.StartHeader();

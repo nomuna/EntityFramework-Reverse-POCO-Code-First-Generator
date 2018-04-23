@@ -7,6 +7,8 @@ namespace Generator.Writer
 {
     public abstract class Writer
     {
+        public abstract void Init();
+
         private readonly GeneratedTextTransformation _outer;
         private readonly Dictionary<string, bool> _supportedFrameworkVersionCache;
         private readonly Version _version;
@@ -134,6 +136,5 @@ namespace Generator.Writer
         }
 
         #endregion
-
     }
 }

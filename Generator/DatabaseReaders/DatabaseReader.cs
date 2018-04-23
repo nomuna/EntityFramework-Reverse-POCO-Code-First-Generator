@@ -7,9 +7,9 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace Generator.SchemaReaders
+namespace Generator.DatabaseReaders
 {
-    public abstract class SchemaReader
+    public abstract class DatabaseReader
     {
         protected abstract string TableSQL();
         protected abstract string ForeignKeySQL();
@@ -60,7 +60,7 @@ namespace Generator.SchemaReaders
             "virtual", "volatile", "void", "while"
         };
 
-        protected SchemaReader(DbProviderFactory factory, GeneratedTextTransformation generatedTextTransformation)
+        protected DatabaseReader(DbProviderFactory factory, GeneratedTextTransformation generatedTextTransformation)
         {
             _factory = factory;
             _generatedTextTransformation = generatedTextTransformation;
