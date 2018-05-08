@@ -559,7 +559,7 @@ namespace Generator.DatabaseReaders
                         sb.Append(string.Format("{0}, ",
                             param.SqlDbType.Equals(structured, StringComparison.InvariantCultureIgnoreCase)
                                 ? param.Name
-                                : "null"));
+                                : "default"));
                     }
 
                     if (proc.Parameters.Count > 0)
