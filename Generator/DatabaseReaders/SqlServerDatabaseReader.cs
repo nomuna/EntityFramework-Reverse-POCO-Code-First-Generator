@@ -820,13 +820,8 @@ SELECT  SERVERPROPERTY('Edition') AS Edition,
                         _sqlDatabaseEdition = rdr["Edition"].ToString();
                         _sqlDatabaseEngineEdition = rdr["EngineEdition"].ToString();
 
-                        //todo move this
-                        if (Settings.IncludeConnectionSettingComments)
-                        {
-                            WriteLine("// Database Edition       : " + _sqlDatabaseEdition);
-                            WriteLine("// Database Engine Edition: " + _sqlDatabaseEngineEdition);
-                            WriteLine(string.Empty);
-                        }
+                        _databaseDetails.AppendLine("// Database Edition       : " + _sqlDatabaseEdition);
+                        _databaseDetails.AppendLine("// Database Engine Edition: " + _sqlDatabaseEngineEdition);
                     }
                 }
             }

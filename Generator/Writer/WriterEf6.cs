@@ -9,44 +9,58 @@
 
         public override void Init()
         {
+            base.Init();
+
+            if (Settings.ElementsToGenerate.HasFlag(Elements.Poco) || Settings.ElementsToGenerate.HasFlag(Elements.PocoConfiguration))
+            {
+                if (Settings.UseDataAnnotations)
+                {
+                    _headerInfo.AppendLine("using System.ComponentModel.DataAnnotations");
+                    _headerInfo.AppendLine("using System.ComponentModel.DataAnnotations.Schema");
+                    _headerInfo.AppendLine(string.Empty);
+                }
+            }
+
+            _headerInfo.AppendLine("namespace " + Settings.Namespace);
+            _headerInfo.AppendLine("{");
         }
 
-        protected override void StoredProcedureReturnModels()
+        public override void Interface()
         {
         }
 
-        protected override void PocoConfiguration()
+        public override void DatabaseContext()
         {
         }
 
-        protected override void PocoClasses()
+        public override void DatabaseContextFactory()
         {
         }
 
-        protected override void FakeContextFactory()
+        public override void FakeContextFactory()
         {
         }
 
-        protected override void DatabaseContextFactory()
+        public override void PocoClasses()
         {
         }
 
-        protected override void DatabaseContext()
+        public override void PocoConfiguration()
         {
         }
 
-        protected override void Interface()
+        public override void StoredProcedureReturnModels()
         {
         }
 
-        protected override void StartHeader()
+        public override void Header()
         {
-            base.StartHeader();
+            base.Header();
         }
 
-        protected override void StartFooter()
+        public override void Footer()
         {
-            base.StartFooter();
+            base.Footer();
         }
     }
 }

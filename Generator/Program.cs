@@ -23,10 +23,10 @@ namespace Generator
             Inflector.PluralizationService = new EnglishPluralizationService();
 
             var path = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            using (var sw = new StreamWriter(Path.Combine(path, "efrpg.txt")))
+            using (var sw = new StreamWriter(Path.Combine(path, "efrpg.cs")))
             {
                 var x = new GeneratedTextTransformation();
-                sw.Write(x.Run());
+                sw.Write(x.Test());
                 sw.Close();
             }
         }

@@ -18,7 +18,7 @@ namespace Generator
         public static string ConnectionString; // = "Data Source=(local);Initial Catalog=Northwind;Integrated Security=True;Application Name=EntityFramework Reverse POCO Generator";
         public static string ProviderName; // = "System.Data.SqlClient";
 
-        public static string Namespace; // Override the default namespace here
+        public static string Namespace = typeof(Settings).Namespace; // Override the default namespace here. Example: Namespace = "CustomNamespace";
         public static string DbContextName = "MyDbContext"; // Note: If generating separate files, please give the db context a different name from this tt filename.
 
         private static string _dbContextInterfaceName;

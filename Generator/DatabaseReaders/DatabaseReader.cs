@@ -40,6 +40,7 @@ namespace Generator.DatabaseReaders
 
         private readonly DbProviderFactory _factory;
         private readonly GeneratedTextTransformation _generatedTextTransformation;
+        protected readonly StringBuilder _databaseDetails;
         public bool IncludeSchema { get; protected set; }
         public bool DoNotSpecifySizeForMaxLength { get; protected set; }
 
@@ -66,6 +67,12 @@ namespace Generator.DatabaseReaders
             _generatedTextTransformation = generatedTextTransformation;
             IncludeSchema = true;
             DoNotSpecifySizeForMaxLength = false;
+            _databaseDetails = new StringBuilder();
+        }
+
+        public string DatabaseDetails()
+        {
+            return _databaseDetails.ToString();
         }
 
         protected DbCommand GetCmd(DbConnection connection)

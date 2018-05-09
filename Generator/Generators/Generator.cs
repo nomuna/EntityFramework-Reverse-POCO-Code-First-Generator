@@ -43,6 +43,11 @@ namespace Generator.Generators
                 DatabaseReader.Init();
         }
 
+        public string DatabaseDetails()
+        {
+            return DatabaseReader.DatabaseDetails();
+        }
+
         public void LoadTables()
         {
             Tables = new Tables();
