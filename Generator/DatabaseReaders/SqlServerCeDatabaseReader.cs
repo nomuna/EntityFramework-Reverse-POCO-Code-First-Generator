@@ -196,6 +196,7 @@ WHERE   TABLE_NAME = '__ExtendedProperties'";
                     break;
 
                 case "decimal":
+                case "numeric":
                     sysType = "Decimal";
                     break;
 

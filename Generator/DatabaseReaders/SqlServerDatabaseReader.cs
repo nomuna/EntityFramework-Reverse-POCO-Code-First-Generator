@@ -859,6 +859,7 @@ SELECT  SERVERPROPERTY('Edition') AS Edition,
                     break;
 
                 case "decimal":
+                case "numeric":
                     sysType = "Decimal";
                     break;
 
