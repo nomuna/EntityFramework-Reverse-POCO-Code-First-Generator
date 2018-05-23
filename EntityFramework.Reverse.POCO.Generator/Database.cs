@@ -524,6 +524,10 @@ namespace EntityFramework_Reverse_POCO_Generator
 
         public FakeMyDbContext()
         {
+            _changeTracker = null;
+            _configuration = null;
+            _database = null;
+
             AlphabeticalListOfProducts = new FakeDbSet<AlphabeticalListOfProduct>("ProductId", "ProductName", "Discontinued", "CategoryName");
             Categories = new FakeDbSet<Category>("CategoryId");
             CategorySalesFor1997 = new FakeDbSet<CategorySalesFor1997>("CategoryName");
