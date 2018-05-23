@@ -9,14 +9,15 @@ namespace Generator
     public static class Settings
     {
         // Main settings **********************************************************************************************************************
+        // The following 3 entries are the the only required settings.
         public static DatabaseType DatabaseType = DatabaseType.SqlServer; // SqlCe. Comming soon: Oracle, MySql, PostgreSQL
         public static GeneratorType GeneratorType = GeneratorType.Ef6; // GeneratorType.EfCore;
         public static string ConnectionStringName = "MyDbContext";   // Searches for this connection string in config files listed below in the ConfigFilenameSearchOrder setting
-        // ConnectionStringName is the only required setting.
-        public static int CommandTimeout = 600; // SQL Command timeout in seconds. 600 is 10 minutes, 0 will wait indefinately. Some databases can be slow retrieving schema information.
+
         // As an alternative to ConnectionStringName above, which must match your app/web.config connection string name, you can override them below
         public static string ConnectionString; // = "Data Source=(local);Initial Catalog=Northwind;Integrated Security=True;Application Name=EntityFramework Reverse POCO Generator";
         public static string ProviderName; // = "System.Data.SqlClient";
+        public static int CommandTimeout = 600; // SQL Command timeout in seconds. 600 is 10 minutes, 0 will wait indefinately. Some databases can be slow retrieving schema information.
 
         public static string Namespace = typeof(Settings).Namespace; // Override the default namespace here. Example: Namespace = "CustomNamespace";
         public static string DbContextName = "MyDbContext"; // Note: If generating separate files, please give the db context a different name from this tt filename.
